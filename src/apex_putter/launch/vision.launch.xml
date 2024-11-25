@@ -5,10 +5,10 @@
     </include> 
 
     <node pkg="apriltag_ros" exec="apriltag_node" output="screen">
-        <remap from="image_rect" to="/camera/image" />
-        <remap from="camera_info" to="/camera/camera_info" />
+        <remap from="image_rect" to="/camera/camera/color/image_raw" />
+        <remap from="camera_info" to="/camera/camera/color/camera_info" />
         <param name="use_sim_time" value="false"/>
-        <param from="$(find-pkg-share apriltag_ros)/share/apriltag_ros/cfg/tags_36h11.yaml" />
+        <param from="$(find-pkg-share apex_putter)/config/atag_ros.yaml" />
     </node>
 
     <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share apex_putter)/config/apriltag.rviz"/>
