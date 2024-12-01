@@ -14,6 +14,16 @@ Project repo for ME495 Final Project Group 3, 2024 Fall
 ## Usage Instructions
 [In progress...]
 
+<Terminal 1>
+- source franka ws
+- source install/setup.bash
+- ros2 launch apex_putter pickplace.launch.py
+
+<Terminal 2> 
+- source franka ws
+- source install/setup.bash
+- ros2 service call /pick std_srvs/srv/Empty
+
 <!-- <Terminal 1>
 - Go into ~/ws/franka
 - `colcon clean workspace`
