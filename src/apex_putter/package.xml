@@ -3,40 +3,10 @@
 <package format="3">
   <name>apex_putter</name>
   <version>0.0.0</version>
-  <description>Mini Golf using Franka arm setup</description>
-  <maintainer email="kylepuckett2029@u.northwestern.edu">Kyle Puckett</maintainer>
+  <description>ME495 Final Project Fall 2024 Group 3 - Apex Putter: a mini-golf robot</description>
+  <maintainer email="wengmister@gmail.com">Zhengyang Kris Weng</maintainer>
   <license>MIT</license>
 
- <!-- Build tool dependencies -->
-  <buildtool_depend>ament_python</buildtool_depend>
-
-  <!-- Build dependencies -->
-  <build_depend>rclpy</build_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <build_depend>sensor_msgs</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>moveit_msgs</build_depend>
-  <build_depend>tf2_ros</build_depend>
-  <build_depend>tf2_geometry_msgs</build_depend>
-  <build_depend>launch</build_depend>
-  <build_depend>launch_ros</build_depend>
-
-  <!-- Execution dependencies -->
-  <exec_depend>rclpy</exec_depend>
-  <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>moveit_msgs</exec_depend>
-  <exec_depend>tf2_ros</exec_depend>
-  <exec_depend>tf2_geometry_msgs</exec_depend>
-  <exec_depend>launch</exec_depend>
-  <exec_depend>launch_ros</exec_depend>
-
-  <!-- Testing dependencies -->
-  <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
-  <test_depend>launch_testing</test_depend>
-  <test_depend>pytest</test_depend>
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
