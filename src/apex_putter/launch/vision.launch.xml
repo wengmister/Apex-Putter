@@ -1,6 +1,6 @@
 <launch>
     <include file="$(find-pkg-share realsense2_camera)/launch/rs_launch.py">
-        <arg name="pointcloud.enable" value="true"/> 
+        <!-- <arg name="pointcloud.enable" value="true"/>  -->
         <arg name="align_depth.enable" value="true"/>
     </include> 
 
