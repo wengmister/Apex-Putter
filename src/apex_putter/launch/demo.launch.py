@@ -34,7 +34,7 @@ def generate_launch_description():
                 LaunchConfiguration('demo'), 'true'))
         ),
         Node(
-            package='motion_planner',
+            package='apex_putter',
             executable='demo_node',
             exec_name='demo_node'
         )

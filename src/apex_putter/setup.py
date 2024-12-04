@@ -10,7 +10,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml',
-                                   'launch/pickplace.launch.py']),
+                                   'launch/pickplace.launch.py',
+                                   'launch/demo.launch.py']),
 
     ],
     install_requires=['setuptools'],
@@ -22,7 +23,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'pick_node = apex_putter.pick_node:main'
+            'pick_node = apex_putter.pick_node:main',
+            'demo_node = apex_putter.demo_node:main'
         ],
     },
 )

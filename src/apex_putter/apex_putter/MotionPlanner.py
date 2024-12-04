@@ -278,8 +278,7 @@ class MotionPlanner():
 
         # translate error code in MoveItErrorCodes
         if error_code.val != MoveItErrorCodes.SUCCESS:
-            self.node.get_logger().error(f"Planning failed with error code: {
-                error_code.val}, message: {error_code.message}, source: {error_code.source}")
+            self.node.get_logger().error(f"Planning failed with error code: {error_code.val}, message: {error_code.message}, source: {error_code.source}")
             return None
 
         if execute:
@@ -508,7 +507,7 @@ class MotionPlanner():
 
         return self.future
 
-    async def plan_cartesian_path_async(self, waypoints, start_pose=None,
+    async def todo(self, waypoints, start_pose=None,
                                         max_velocity_scaling_factor=0.1,
                                         max_acceleration_scaling_factor=0.1,
                                         avoid_collisions=True):

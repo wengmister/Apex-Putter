@@ -32,9 +32,9 @@ class MotionPlanningInterface():
     def plan_cartesian_path(self, waypoints, start_pose=None,
                             max_velocity_scaling_factor=0.1,
                             max_acceleration_scaling_factor=0.1,
-                            execute=False, avoid_collisions=True):
+                            avoid_collisions=True):
         return self.MotionPlanner.plan_cartesian_path(waypoints, start_pose, max_velocity_scaling_factor,
-                                                      max_acceleration_scaling_factor, execute, avoid_collisions)
+                                                      max_acceleration_scaling_factor, avoid_collisions)
 
     def execute_trajectory(self, trajectory):
         return self.MotionPlanner.execute_trajectory(trajectory)

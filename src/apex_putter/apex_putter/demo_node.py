@@ -9,7 +9,7 @@ SERVICES:
 
 from enum import auto, Enum
 
-from motion_planner.MotionPlanningInterface import MotionPlanningInterface
+from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 from moveit_msgs.action import ExecuteTrajectory
 from moveit_msgs.msg import RobotState
 import rclpy
