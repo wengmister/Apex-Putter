@@ -11,5 +11,7 @@
         <param from="$(find-pkg-share apex_putter)/config/atag_ros.yaml" />
     </node>
 
+    <node pkg="apex_putter" exec="vision" output="screen"/>
+
     <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share apex_putter)/config/apriltag.rviz"/>
 </launch>
