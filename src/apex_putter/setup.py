@@ -12,10 +12,10 @@ setup(
         ('share/' + package_name, ['package.xml',
                                    'launch/demo.launch.py',
                                    'launch/pickplace.launch.py',
-                                   'launch/vision.launch.xml']),
-        ('share/' + package_name + '/config/', ['config/apriltag.rviz',
-                                                'config/atag_ros.yaml'])
-
+                                   'launch/vision.launch.xml'
+                                   'config/apriltag.rviz',
+                                   'config/demo.rviz',
+                                   'config/atag_ros.yaml']),
 
     ],
     install_requires=['setuptools'],
