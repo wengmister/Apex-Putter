@@ -12,7 +12,7 @@ setup(
         ('share/' + package_name, ['package.xml',
                                    'launch/demo.launch.py',
                                    'launch/pickplace.launch.py',
-                                   'launch/vision.launch.xml'
+                                   'launch/vision.launch.xml',
                                    'config/apriltag.rviz',
                                    'config/demo.rviz',
                                    'config/atag_ros.yaml']),

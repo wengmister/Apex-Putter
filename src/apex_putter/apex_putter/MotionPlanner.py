@@ -507,7 +507,7 @@ class MotionPlanner():
 
         return self.future
 
-    async def todo(self, waypoints, start_pose=None,
+    async def plan_cartesian_path_async(self, waypoints, start_pose=None,
                                         max_velocity_scaling_factor=0.1,
                                         max_acceleration_scaling_factor=0.1,
                                         avoid_collisions=True):
@@ -534,31 +534,38 @@ class MotionPlanner():
                 otherwise 'planned_trajectory'.
 
         """
+        # very hacky method.
         self.node.get_logger().info("Planning cartesian path async")
+        start_state = start_pose
+        # if start_pose is None:
+        #     start_pose = await self.robot_state.get_current_end_effector_pose()
+        #     self.node.get_logger().info(
+        #         f'Current end effector pose: {start_pose}, \
+        #         type: {type(start_pose)}')
+        #     # Check if the transform is available
+        #     if start_pose is None:
+        #         self.node.get_logger().error(
+        #             'Could not get current end effector pose.')
+        #         return None
 
-        if start_pose is None:
-            start_pose = await self.robot_state.get_current_end_effector_pose()
-            self.node.get_logger().info(
-                f'Current end effector pose: {start_pose}, \
-                type: {type(start_pose)}')
-            # Check if the transform is available
-            if start_pose is None:
-                self.node.get_logger().error(
-                    'Could not get current end effector pose.')
-                return None
+        # # Convert start_pose to RobotState using IK
+        # start_state = None
+        # if start_pose is not None:
+            # if not isinstance(start_pose, PoseStamped):
+            #     self.node.get_logger().error(f"Invalid type for start_pose: {type(start_pose)}. Expected PoseStamped.")
+            #     return None
+            # else:
+            #     self.node.get_logger().error("yay!!")
 
-        # Convert start_pose to RobotState using IK
-        start_state = None
-        if start_pose is not None:
-            self.node.get_logger().info(f'No start state provided. \
-                                        Deriving start state from start pose: \
-                                        {start_pose}')
-            start_state = await self.robot_state.compute_inverse_kinematics(
-                start_pose)
-            if start_state is None:
-                self.node.get_logger().error('Failed to convert start_pose to \
-                                             RobotState using IK.')
-                return None
+
+            # self.node.get_logger().info(f'No start state provided. \
+            #                             Deriving start state from start pose: \
+            #                             {start_pose}')
+            # start_state = await self.robot_state.compute_inverse_kinematics(start_pose.pose)
+            # if start_state is None:
+            #     self.node.get_logger().error('Failed to convert start_pose to \
+            #                                  RobotState using IK.')
+            #     return None
 
         self.node.get_logger().info(f"Waypoint: {waypoints}")
 

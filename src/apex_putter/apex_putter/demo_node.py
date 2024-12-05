@@ -132,13 +132,13 @@ class DemoNode(Node):
             if self.task_step == 0:
                 self.get_logger().info("Step 0")
                 self.get_logger().info(f'Planned cartesian waypoints: {self.waypoints}')
-                # robot_state = self.MPI.RobotState.get_current_joint_state()
+                robot_state = self.MPI.RobotState.get_current_joint_state()
                 # robot_pose = self.MPI.RobotState.compute_forward_kinematics(robot_state)
                 # robot_pose = robot_state.position
                 # self.get_logger().info(f'Curr robot state pose converted : {robot_pose}')
 
-                # start_pose=robot_state,
-                self.plan_traj_future = self.MPI.plan_cartesian_path(waypoints=self.waypoints)         
+                start_state=robot_state,
+                self.plan_traj_future = self.MPI.plan_cartesian_path(waypoints=self.waypoints, start_pose=start_state)         
 
                 # self.plan_traj_future = self.MPI.plan_joint_space(
                 #     self.man_joint_names,
