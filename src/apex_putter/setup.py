@@ -10,8 +10,12 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml',
+                                   'launch/demo.launch.py',
                                    'launch/pickplace.launch.py',
-                                   'launch/demo.launch.py']),
+                                   'launch/vision.launch.xml']),
+        ('share/' + package_name + '/config/', ['config/apriltag.rviz',
+                                                'config/atag_ros.yaml'])
+
 
     ],
     install_requires=['setuptools'],
@@ -24,6 +28,7 @@ setup(
     entry_points={
         'console_scripts': [
             'pick_node = apex_putter.pick_node:main',
+            'vision = apex_putter.vision:main',
             'demo_node = apex_putter.demo_node:main'
         ],
     },
