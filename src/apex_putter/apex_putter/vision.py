@@ -50,7 +50,8 @@ class Vision(Node):
         """Publish robot base frame"""
         robot_base_transform = TransformStamped()
         robot_base_transform.header.stamp = self.get_clock().now().to_msg()
-        robot_base_transform.header.frame_id = 'tag36h11:9'
+        # robot_base_transform.header.frame_id = 'tag36h11:9'
+        robot_base_transform.header.frame_id = 'robot_base_tag'
         robot_base_transform.child_frame_id = 'robot_base_frame'
         robot_base_transform.transform = self.atag_to_rbf_transform
 
