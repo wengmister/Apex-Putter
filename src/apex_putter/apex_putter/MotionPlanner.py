@@ -94,6 +94,8 @@ from tf2_ros.transform_listener import TransformListener
 
 from .RobotState import RobotState as RS
 
+import math
+
 
 class MotionPlanner():
 
@@ -873,3 +875,72 @@ class MotionPlanner():
         ).add_done_callback(self.done_callback)
 
         return self.future
+    
+    async def plan_swing_trajectory_async(self, ball_position, swing_offset=0.05):
+        """
+        Plans and executes the swing trajectory to hit the ball.
+
+        Args:
+            ball_position (list): The [x, y, z] position of the ball.
+            swing_offset (float): Offset to define pre-swing and post-swing positions.
+
+        Returns:
+            bool: True if the swing was successfully executed, False otherwise.
+        """
+        # Get current end-effector pose
+        current_pose = await self.robot_state.get_current_end_effector_pose()
+        if current_pose is None:
+            self.node.get_logger().error('Could not get current end-effector pose.')
+            return False
+
+        # Define pre-swing pose (just before hitting the ball)
+        pre_swing_pose = Pose()
+        pre_swing_pose.position.x = ball_position[0] - swing_offset
+        pre_swing_pose.position.y = ball_position[1]
+        pre_swing_pose.position.z = ball_position[2] + 0.1  # Slightly above the ball
+        pre_swing_pose.orientation = current_pose.pose.orientation
+
+        # Define swing pose (through the ball)
+        swing_pose = Pose()
+        swing_pose.position.x = ball_position[0] + swing_offset
+        swing_pose.position.y = ball_position[1]
+        swing_pose.position.z = ball_position[2]
+        swing_pose.orientation = current_pose.pose.orientation
+
+        # Move to pre-swing pose
+        pre_swing_future = self.plan_work_space(
+            goal_position=[pre_swing_pose.position.x, pre_swing_pose.position.y, pre_swing_pose.position.z],
+            goal_orientation=pre_swing_pose.orientation,
+            execute=True
+        )
+        pre_swing_traj = await pre_swing_future
+        if pre_swing_traj is None:
+            self.node.get_logger().error('Failed to plan to pre-swing pose.')
+            return False
+
+        # Plan and execute swing trajectory
+        swing_waypoints = [pre_swing_pose, swing_pose]
+        swing_future = self.plan_cartesian_path(
+            waypoints=swing_waypoints,
+            execute=True
+        )
+        swing_traj = await swing_future
+        if swing_traj is None:
+            self.node.get_logger().error('Failed to plan swing trajectory.')
+            return False
+
+        # Execution is handled within the plan methods if execute=True
+        self.node.get_logger().info('Swing trajectory executed successfully.')
+        return True
+    
+    def plan_swing_trajectory(self, ball_position, swing_offset=0.05):
+        self.future = Future()
+        rclpy.get_global_executor().create_task(
+            self.plan_swing_trajectory_async(ball_position, swing_offset)
+        ).add_done_callback(self.done_callback)
+        return self.future
+
+    def calculate_initial_ball_velocity(self, distance, mu=0.1):
+        g = 9.81  # m/s^2
+        v0 = math.sqrt(2 * mu * g * distance)
+        return v0

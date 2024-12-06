@@ -23,7 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'pick_node = apex_putter.pick_node:main',
+            # 'pick_node = apex_putter.pick_node:main',
             'demo_node = apex_putter.demo_node:main'
         ],
     },

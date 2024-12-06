@@ -53,6 +53,9 @@ class MotionPlanningInterface():
 
     def plan_to_named_configuration(self, named_configuration, start_pose, max_velocity_scaling_factor, max_acceleration_scaling_factor, execute):
         return self.MotionPlanner.plan_to_named_config(named_configuration, start_pose, max_velocity_scaling_factor, max_acceleration_scaling_factor, execute)
+    
+    def plan_swing_trajectory(self, ball_position):
+        return self.MotionPlanner.plan_swing_trajectory(ball_position)
 
     # RobotState functions
     async def get_current_end_effector_pose(self):
