@@ -23,7 +23,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'vision = apex_putter.vision:main'
+            'vision = apex_putter.vision:main',
+            'yolo = apex_putter.yolo:main',
         ],
     },
 )
