@@ -15,4 +15,4 @@ Since ROS2 doesn't work with normal venv, and pip install doesn't work with syst
 
 We will need to source this pkg install location to use the dependant packages.
 
-
+See https://nu-msr.github.io/ros_notes/ros2/colcon.html#pip_ros for more details.
