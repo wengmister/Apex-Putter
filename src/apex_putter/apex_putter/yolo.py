@@ -1,3 +1,4 @@
+import cv2
 import rclpy
 from ultralytics import YOLO
 from rclpy.node import Node
@@ -35,9 +36,22 @@ class YoloNode(Node):
         cv_image = self.bridge.imgmsg_to_cv2(image, desired_encoding='bgr8')
         # Run the model
         results = self.model(cv_image)
-        # Get the result and draw it on an OpenCV image
-        frame = results[0].plot()
-        new_msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
+
+        # Process the results (draw bounding boxes on the image)
+        for result in results:
+            cv_image = result.plot()
+
+            # Check if any of the detected objects is a person
+            for box in result.boxes:
+                x, y, w, h = box.xywh[0]  # center x, center y, width, height\
+                self.get_logger().info(f"Detected object at ({x}, {y}) with width {w} and height {h}")
+                center_x = int(x)
+                center_y = int(y)
+                
+                # Draw red dot (circle) at center
+                cv2.circle(cv_image, (center_x, center_y), 5, (0, 0, 255), -1)  # -1 fills the circle
+        
+        new_msg = self.bridge.cv2_to_imgmsg(cv_image, encoding='bgr8')
         # publish
         self.pub.publish(new_msg)
 
