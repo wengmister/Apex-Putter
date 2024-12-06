@@ -24,7 +24,7 @@ class YoloNode(Node):
         super().__init__("pose")
         self.bridge = CvBridge()
         self.declare_parameter("model",
-                               value="yolo11n.pt")
+                               value="best.pt")
         self.model = YOLO(self.get_parameter("model").get_parameter_value().string_value)
         self.create_subscription(Image, '/camera/camera/color/image_raw', self.yolo_callback, 10)
         self.pub = self.create_publisher(Image, 'image_yolo', 10)
