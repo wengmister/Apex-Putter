@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['golf_balls']
+
+roboflow:
+  workspace: minigolf-b4fbr
+  project: mini_golf_rs
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/minigolf-b4fbr/mini_golf_rs/dataset/1
