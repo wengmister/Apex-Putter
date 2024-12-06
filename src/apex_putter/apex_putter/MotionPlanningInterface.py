@@ -84,6 +84,7 @@ class MotionPlanningInterface():
         if start_pose is None:
             start_pose = await self.RobotState.get_current_end_effector_pose()
         start_state = await self.RobotState.compute_inverse_kinematics(curr_pose=start_pose.pose, group_name=self.arm_move_group)
+        print("start_state passed.")
         traj = await self.MotionPlanner.plan_cartesian_path_async(
             waypoints=waypoints,
             group_name=self.arm_move_group,
@@ -92,6 +93,7 @@ class MotionPlanningInterface():
             max_acceleration_scaling_factor=max_acceleration_scaling_factor,
             avoid_collisions=avoid_collisions
         )
+        print("traj passed.")
         return await self.MotionPlanner.execute_trajectory_async(
             trajectory=traj,
             controller=self.arm_controller

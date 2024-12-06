@@ -1,7 +1,9 @@
+from asyncio import Future
 from geometry_msgs.msg import Pose
 from moveit_msgs.msg import AttachedCollisionObject, CollisionObject
 from moveit_msgs.msg import PlanningScene as PlanningMsg
 from moveit_msgs.srv import ApplyPlanningScene
+import rclpy
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.node import Node
 from shape_msgs.msg import SolidPrimitive
@@ -77,7 +79,6 @@ class PlanningSceneClass:
         result = await self._apply_collision_object(collision_object)
         return result
 
-<<<<<<< HEAD
     async def add_sphere_async(self, sphere_id, radius, position, orientation=(0.0, 0.0, 0.0, 1.0), frame_id='base'):
         """
         Adds a sphere to the planning scene asynchronously.
@@ -159,8 +160,6 @@ class PlanningSceneClass:
 
         return self.future
 
-=======
->>>>>>> main
     async def attach_object_async(self, object_id, link_name):
         """Attach a collision object to the robot's end-effector synchronously."""
         attached_object = AttachedCollisionObject()
