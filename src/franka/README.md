@@ -1,8 +1,35 @@
 # Using franka with Apex_Putter
 
-* 'source /opt/ros/jazzy/setup.bash'
+#### **Original Joint to Tool Origin**
+```yaml
+src/'Apex-Putter>src>franka>src>franka_description>robots>fer' was modified so that 
+
+joint8:
+  kinematic:
+    x: 0
+    y: 0
+    z: 0.107
+    roll: 0
+    pitch: 0
+    yaw: 0
+
+was changed to include the golf club length. 
+
+The new joint8 length is:
+
+# Joint to tool origin
+joint8:
+  kinematic:
+    x: 0
+    y: 0
+    z: 0.68739
+    roll: 0
+    pitch: 0
+    yaw: 0
 
 <Terminal 1>
+* 'source /opt/ros/jazzy/setup.bash'
+
 * 'cd ~/ws/final_project/src/Apex-Putter/src/franka'
 
 Build the franka workspace:
