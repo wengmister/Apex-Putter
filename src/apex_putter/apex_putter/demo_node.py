@@ -14,6 +14,10 @@ from tf2_geometry_msgs import PoseStamped as Tf2PoseStamped
 
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 from apex_putter.BallTrajectoryCalc import BallTrajectoryCalculator
+import apex_putter.transform_operations as transOps
+
+# Import quaternion_from_euler to set orientation (currently not used)
+from tf_transformations import quaternion_from_euler
 
 class State(Enum):
     START = auto()
@@ -24,115 +28,137 @@ class DemoNode(Node):
     def __init__(self):
         super().__init__('demo_node')
 
-        # Parameter to toggle simulation mode vs real-world mode
+        # Parameter to toggle simulation vs real-world
         self.declare_parameter('simulation_mode', True)
         self.use_simulation_mode = self.get_parameter('simulation_mode').get_parameter_value().bool_value
 
-        # Initialize motion planning interface
+        # Declare parameters for frames
+        self.declare_parameter('ball_tag_frame', 'ball_tag')
+        self.declare_parameter('hole_tag_frame', 'hole_tag')
+        self.declare_parameter('robot_base_tag_frame', 'robot_base_tag')
+        self.declare_parameter('base_frame', 'base')
+        self.declare_parameter('camera_frame', 'camera_link')
+
+        self.ball_tag_frame = self.get_parameter('ball_tag_frame').get_parameter_value().string_value
+        self.hole_tag_frame = self.get_parameter('hole_tag_frame').get_parameter_value().string_value
+        self.robot_base_tag_frame = self.get_parameter('robot_base_tag_frame').get_parameter_value().string_value
+        self.base_frame = self.get_parameter('base_frame').get_parameter_value().string_value
+        self.camera_frame = self.get_parameter('camera_frame').get_parameter_value().string_value
+
+        # Known offsets:
+        # Putter length ~22.85 in = 0.58 m
+        # Offset from shaft: 0.18 in = ~0.00457 m
+        self.putter_length = 22.85 * 0.0254
+        self.putter_offset = 0.18 * 0.0254
+
+        # Motion planning interface
         self.MPI = MotionPlanningInterface(
             node=self,
-            base_frame='base',  # Adjust if needed
+            base_frame=self.base_frame,
             end_effector_frame='fer_link8'
         )
 
-        # Hard-coded hole position (for now still fixed)
+        # Hard-coded hole (used in sim mode)
         self.hole_position = np.array([0.8, 0.0, 0.0])
-        # Ball position initially hard-coded, will be updated if real-world mode
-        self.ball_position = np.array([0.5, 0.0, 0.0])
+        self.ball_position = np.array([0.5, 0.0, 0.0])  # Updated in real mode
 
         self.trajectory_calculator = BallTrajectoryCalculator(self.ball_position, self.hole_position)
 
-        # Define the robot's start pose
+        # Start pose
         self.start_pose = Pose()
         self.start_pose.position.x = 0.4
         self.start_pose.position.y = 0.0
         self.start_pose.position.z = 0.4
         self.start_pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
 
-        # Compute waypoints either from the hard-coded ball/hole or updated positions
+        # Initial waypoints
         self.waypoints = self.compute_waypoints()
 
-        # TF Buffer and Listener for transforming from camera frame to robot frame
-        # Assuming 'base' is robot frame and 'camera_link' is camera frame
+        # TF setup
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
-        # Subscriber to a topic that provides ball position in camera frame (real-world)
-        # If this topic is not available, you can comment it out or adapt
-        self.ball_pose_sub = self.create_subscription(
-            PoseStamped,
-            '/ball_pose_camera',  # Example topic name
-            self.ball_pose_callback,
-            10
-        )
-
-        # Internal state machine
+        # State machine
         self.state = State.START
         self.task_step = 0
 
-        # Set up markers for ball and hole
+        # Markers
         self.ball_marker_pub = self.create_publisher(Marker, 'ball_marker', 10)
         self.hole_marker_pub = self.create_publisher(Marker, 'hole_marker', 10)
         self.ball_marker = Marker()
         self.hole_marker = Marker()
         self.setup_ball_marker()
         self.setup_hole_marker()
+        self.ball_animation_timer = None
 
-        # Timer to continuously republish markers so they stay visible in RViz
+        # 1 Hz
         self.marker_timer = self.create_timer(1.0, self.publish_markers)
 
-        # Animation variables for the ball
-        self.ball_animation_timer = None
-        self.ball_animation_time = 0.0
-        self.ball_animation_dt = 0.05
-        self.ball_animation_end_time = 0.0
-        self.ball_initial_velocity = 0.0
-        self.ball_acceleration = 0.0
-        self.ball_direction = np.array([0.0, 0.0, 0.0])
+        # Services
+        self.sim_srv = self.create_service(Empty, 'simulate', self.sim_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.real_putt_srv = self.create_service(Empty, 'real_putt', self.real_putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
 
-        # Services:
-        # test_callback: runs the simple simulation demonstration
-        self.demo_test_srv = self.create_service(Empty, 'demo_test', self.test_callback, callback_group=MutuallyExclusiveCallbackGroup())
-        # put_callback: executes the entire motion sequence with current ball/hole position (real or simulated)
-        self.put_srv = self.create_service(Empty, 'put', self.put_callback, callback_group=MutuallyExclusiveCallbackGroup())
-
-        # Use an asynchronous callback for the timer so we can await coroutines
+        # Timer for optional tasks
         self.timer = self.create_timer(0.1, self.timer_callback)
 
-        self.get_logger().info("DemoNode initialized. Waiting for demo_test or put service calls to start demo.")
+        self.get_logger().info("DemoNode initialized. Use '/simulate' for simulation or '/real_putt' for real-world mode.")
 
-
-    def ball_pose_callback(self, msg: PoseStamped):
-        """
-        Receive ball position in camera frame and transform it into robot frame.
-        Update self.ball_position accordingly if in real-world mode.
-        """
-        if self.use_simulation_mode:
-            # In simulation mode, we ignore real-world TF updates
-            return
-
+    def update_real_world_positions(self):
         try:
-            # Wait for transform from camera frame to base frame
-            transform = self.tf_buffer.lookup_transform('base', msg.header.frame_id, rclpy.time.Time())
-            # Transform the pose to base frame
-            ps = Tf2PoseStamped(msg)
-            ps_base = tf2_ros.do_transform_pose(ps, transform)
-            # Update ball position in robot frame
-            self.ball_position = np.array([ps_base.pose.position.x, ps_base.pose.position.y, ps_base.pose.position.z])
-            self.get_logger().info(f"Updated ball position in robot frame: {self.ball_position}")
+            # If direct transforms from base->tag are available, uncomment these:
+            # hole_tf = self.tf_buffer.lookup_transform(self.base_frame, self.hole_tag_frame, rclpy.time.Time())
+            # self.hole_position = np.array([
+            #     hole_tf.transform.translation.x,
+            #     hole_tf.transform.translation.y,
+            #     hole_tf.transform.translation.z
+            # ])
+            #
+            # ball_tf = self.tf_buffer.lookup_transform(self.base_frame, self.ball_tag_frame, rclpy.time.Time())
+            # self.ball_position = np.array([
+            #     ball_tf.transform.translation.x,
+            #     ball_tf.transform.translation.y,
+            #     ball_tf.transform.translation.z
+            # ])
 
-            # Recompute waypoints after updating ball position
-            self.waypoints = self.compute_waypoints()
+            # Otherwise, use matrix approach:
+            base_cam_tf = self.tf_buffer.lookup_transform(self.base_frame, self.camera_frame, rclpy.time.Time())
+            cam_hole_tf = self.tf_buffer.lookup_transform(self.camera_frame, self.hole_tag_frame, rclpy.time.Time())
+            cam_ball_tf = self.tf_buffer.lookup_transform(self.camera_frame, self.ball_tag_frame, rclpy.time.Time())
 
+            T_base_cam = transOps.transform_to_htm(base_cam_tf.transform)
+            T_cam_hole = transOps.transform_to_htm(cam_hole_tf.transform)
+            T_cam_ball = transOps.transform_to_htm(cam_ball_tf.transform)
+
+            T_base_hole = T_base_cam @ T_cam_hole
+            T_base_ball = T_base_cam @ T_cam_ball
+
+            ball_offset = np.array([0.0, 0.0, 0.0])
+            self.hole_position = T_base_hole[0:3, 3]
+            self.ball_position = T_base_ball[0:3, 3] + ball_offset
+
+            self.get_logger().info(f"Real world positions updated: Ball at {self.ball_position}, Hole at {self.hole_position}")
         except Exception as e:
-            self.get_logger().error(f"Failed to transform ball pose: {e}")
+            self.get_logger().error(f"Could not update real world positions: {e}")
+
+    # Commenting out the putter offset application for testing
+    # def apply_putter_offset(self, waypoint_pose):
+    #     x = waypoint_pose.position.x
+    #     y = waypoint_pose.position.y
+    #     z = waypoint_pose.position.z
+
+    #     z = z + self.putter_length
+    #     x = x - self.putter_offset
+
+    #     waypoint_pose.position.x = x
+    #     waypoint_pose.position.y = y
+    #     waypoint_pose.position.z = z
+    #     return waypoint_pose
 
     def compute_waypoints(self):
-        """Compute waypoints from behind the ball, through the ball, and beyond the hole."""
         direction = self.hole_position - self.ball_position
         distance = np.linalg.norm(direction)
         if distance < 1e-6:
-            self.get_logger().error("Ball and hole are at the same position! Using default waypoints.")
+            self.get_logger().error("Ball and hole overlap. Using default waypoints.")
             return self.default_waypoints()
 
         unit_dir = direction / distance
@@ -145,7 +171,11 @@ class DemoNode(Node):
             p.position.x = float(x)
             p.position.y = float(y)
             p.position.z = float(z)
+            # Keep orientation as identity, assuming fer_link8 is already oriented correctly
             p.orientation.w = 1.0
+            p.orientation.x = 0.0
+            p.orientation.y = 0.0
+            p.orientation.z = 0.0
             return p
 
         z_height = 0.4
@@ -153,34 +183,38 @@ class DemoNode(Node):
         wp2 = make_pose(at_ball_pos[0], at_ball_pos[1], z_height)
         wp3 = make_pose(beyond_hole_pos[0], beyond_hole_pos[1], z_height)
 
+        # Commenting out putter offset for testing
+        # if not self.use_simulation_mode:
+        #     wp1 = self.apply_putter_offset(wp1)
+        #     wp2 = self.apply_putter_offset(wp2)
+        #     wp3 = self.apply_putter_offset(wp3)
+
         return [wp1, wp2, wp3]
 
     def default_waypoints(self):
-        # Fallback if ball/hole coincide
-        waypoint1 = Pose()
-        waypoint1.position.x = 0.45
-        waypoint1.position.y = 0.0
-        waypoint1.position.z = 0.4
-        waypoint1.orientation.w = 1.0
+        w1 = Pose()
+        w1.position.x = 0.45
+        w1.position.y = 0.0
+        w1.position.z = 0.4
+        w1.orientation.w = 1.0
 
-        waypoint2 = Pose()
-        waypoint2.position.x = 0.5
-        waypoint2.position.y = 0.0
-        waypoint2.position.z = 0.4
-        waypoint2.orientation.w = 1.0
+        w2 = Pose()
+        w2.position.x = 0.5
+        w2.position.y = 0.0
+        w2.position.z = 0.4
+        w2.orientation.w = 1.0
 
-        waypoint3 = Pose()
-        waypoint3.position.x = 0.55
-        waypoint3.position.y = 0.0
-        waypoint3.position.z = 0.4
-        waypoint3.orientation.w = 1.0
-        return [waypoint1, waypoint2, waypoint3]
+        w3 = Pose()
+        w3.position.x = 0.55
+        w3.position.y = 0.0
+        w3.position.z = 0.4
+        w3.orientation.w = 1.0
+        return [w1, w2, w3]
 
     def setup_ball_marker(self):
-        """Set up a Marker to represent the ball in RViz."""
         self.ball_marker.ns = "ball_marker_ns"
         self.ball_marker.id = 0
-        self.ball_marker.header.frame_id = 'base'
+        self.ball_marker.header.frame_id = self.base_frame
         self.ball_marker.type = Marker.SPHERE
         self.ball_marker.action = Marker.ADD
         self.ball_marker.scale.x = 0.03
@@ -196,10 +230,9 @@ class DemoNode(Node):
         self.ball_marker.pose.position.z = float(self.ball_position[2])
 
     def setup_hole_marker(self):
-        """Set up a Marker to represent the hole in RViz."""
         self.hole_marker.ns = "hole_marker_ns"
         self.hole_marker.id = 0
-        self.hole_marker.header.frame_id = 'base'
+        self.hole_marker.header.frame_id = self.base_frame
         self.hole_marker.type = Marker.CYLINDER
         self.hole_marker.action = Marker.ADD
         self.hole_marker.scale.x = 0.1
@@ -221,55 +254,51 @@ class DemoNode(Node):
         self.ball_marker_pub.publish(self.ball_marker)
         self.hole_marker_pub.publish(self.hole_marker)
 
-    async def test_callback(self, request, response):
-        """
-        Service callback to start the demo using the currently known ball and hole positions (simulation mode).
-        This just executes a Cartesian path from behind the ball through it towards the hole.
-        """
-        self.task_step = 0
-        self.state = State.TASK
-        self.get_logger().info("Demo (simulation) started via service call.")
+    async def sim_callback(self, request, response):
+        if not self.use_simulation_mode:
+            self.get_logger().warn("simulate service called, but simulation_mode is False.")
+        self.get_logger().info("Simulation started.")
+        success = await self.run_motion_sequence()
+        if success:
+            self.get_logger().info("Simulation done.")
+        else:
+            self.get_logger().error("Simulation failed.")
         return response
 
-    async def put_callback(self, request, response):
-        """
-        Another service callback that attempts the entire motion sequence as if putting the ball:
-        In simulation mode, uses hard-coded positions.
-        In real-world mode, expects ball_position to have been updated from TF subscriber.
-        """
-        self.get_logger().info("Received request to put the ball. Attempting full motion sequence...")
-        # Similar logic as test_callback but you can add more steps or different approach if needed
-        self.task_step = 0
-        self.state = State.TASK
+    async def real_putt_callback(self, request, response):
+        if self.use_simulation_mode:
+            self.get_logger().info("Real putt requested, but simulation_mode is True. Switch to False.")
+            return response
+
+        self.get_logger().info("Real-world putt requested.")
+        # Update real-world positions from TF
+        self.update_real_world_positions()
+        # Recompute waypoints
+        self.waypoints = self.compute_waypoints()
+
+        self.get_logger().info("Executing real-world motion sequence...")
+        success = await self.run_motion_sequence()
+        if success:
+            self.get_logger().info("Real-world putt done.")
+        else:
+            self.get_logger().error("Real-world putt failed.")
         return response
 
-    async def timer_callback(self):
-        if self.state == State.START:
-            self.state = State.IDLE
-
-        elif self.state == State.IDLE:
-            pass
-
-        elif self.state == State.TASK:
-            if self.task_step == 0:
-                self.get_logger().info("Planning a cartesian path with computed waypoints...")
-                result = await self.MPI.move_arm_cartesian(
-                    waypoints=self.waypoints,
-                    avoid_collisions=False
-                )
-
-                if result:
-                    self.get_logger().info("Trajectory executed successfully. Robot should have 'hit' the ball now.")
-                    self.task_step += 1
-
-                    self.get_logger().info("Animating the ball movement with friction...")
-                    unit_direction, distance = self.calculate_ball_trajectory()
-                    self.animate_ball_movement(unit_direction, distance)
-
-                    self.state = State.IDLE
-                else:
-                    self.get_logger().error("Planning or execution failed.")
-                    self.state = State.IDLE
+    async def run_motion_sequence(self):
+        self.get_logger().info("Planning and executing Cartesian path...")
+        result = await self.MPI.move_arm_cartesian(
+            waypoints=self.waypoints,
+            avoid_collisions=False
+        )
+        if result:
+            self.get_logger().info("Trajectory executed. Robot has 'hit' the ball.")
+            self.get_logger().info("Animating ball movement...")
+            unit_direction, distance = self.calculate_ball_trajectory()
+            self.animate_ball_movement(unit_direction, distance)
+            return True
+        else:
+            self.get_logger().error("Planning or execution failed.")
+            return False
 
     def calculate_ball_trajectory(self):
         unit_direction, distance = self.trajectory_calculator.calculate_trajectory()
@@ -313,6 +342,11 @@ class DemoNode(Node):
         self.ball_marker_pub.publish(self.ball_marker)
 
         self.ball_animation_time += self.ball_animation_dt
+
+    def timer_callback(self):
+        # You can leave this empty if no periodic tasks are needed
+        if self.state == State.START:
+            self.state = State.IDLE
 
 def main(args=None):
     rclpy.init(args=args)
