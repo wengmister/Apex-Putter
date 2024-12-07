@@ -3,6 +3,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import Transform, TransformStamped
 from transforms3d.quaternions import quat2mat, mat2quat
 from transforms3d.affines import compose, decompose
+import RobotState as RS
+from geometry_msgs.msg import Pose
 
 def htm_to_transform(htm: np.array) -> Transform:
     """
@@ -23,6 +25,30 @@ def htm_to_transform(htm: np.array) -> Transform:
     result.rotation.z = float(quaternion[3])
 
     return result
+
+def transform_to_htm(transform: Transform) -> np.array:
+    '''
+    Args:
+        transform: Transfrom is msg type of tf publisher.
+    Returns:
+        htm format of the same (4x4 np.array): homogeneous transformation matrix 
+    '''
+    translation = np.array([
+        transform.translation.x,
+        transform.translation.y,
+        transform.translation.z
+    ])
+    quaternion = np.array([
+        transform.rotation.w,
+        transform.rotation.x,
+        transform.rotation.y,
+        transform.rotation.z
+    ])
+    rotation_matrix = quat2mat(quaternion)
+    htm = np.eye(4)
+    htm[0:3, 0:3] = rotation_matrix 
+    htm[0:3, 3] = translation 
+    return htm
 
 def combine_transforms(known_matrix: np.array, tag_transform: TransformStamped) -> Transform:
     """
@@ -57,3 +83,55 @@ def combine_transforms(known_matrix: np.array, tag_transform: TransformStamped) 
     result = htm_to_transform(result_matrix)
     
     return result
+
+def obj_in_bot_frame(T_camObj):
+    '''
+    Input(4x4 np.array): Camera-to-Ball transform  T_camObj
+    Output(4x4 np.array): T_objBot
+    Fixed: T_botCam    
+    '''
+    # Write the fixed frame transform here.
+    T_botCam = np.array([0])
+    T_objBot = np.dot(np.linalg.inv(T_camObj),np.linalg.inv(T_botCam))
+    return T_objBot
+
+def detected_obj_pose(T_camObj: Transform):
+    '''
+    This function returns the pose in robot frame of the robot to 
+    reach the object detected by vision.
+
+    Args: 
+        transform: tf of object detected in camera frame
+    Returns:
+        pose: pose(or waypoint) of the object in robot frame.
+    '''
+
+    T_camObj = transform_to_htm(T_camObj)
+    T_objBot = obj_in_bot_frame(T_camObj)
+    pose = Pose()
+    pose.position.x = T_objBot[0,3]
+    pose.position.y = T_objBot[1,3]
+    pose.position.z = T_objBot[2,3]
+    # Figure a way to calc optimal orientation
+    # pose.orientation.x = 0.90305
+    # pose.orientation.y = 0.429622
+    # pose.orientation.z = -3.8634e-05
+    # pose.orientation.w = -5.0747e-06
+    return pose
+
+
+# Test functions
+def test():
+    manipulator_pos = np.array([
+    [0.0458594, 0.72962853, 0.32706892, 0.2591416],
+    [0.99449429, 0.12350677, 0.26538611, 0.44454056],
+    [0.07726874, 0.25718417, 0.19591819, 0.66401457],
+    [0.0868532, 0.12757232, 0.78079625, 0.92614628]
+])
+    
+    tranfrom = htm_to_transform(manipulator_pos)
+    htm = transform_to_htm(tranfrom)
+    print(htm)
+
+
+test()
