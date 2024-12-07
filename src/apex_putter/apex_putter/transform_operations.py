@@ -3,7 +3,6 @@ from rclpy.node import Node
 from geometry_msgs.msg import Transform, TransformStamped
 from transforms3d.quaternions import quat2mat, mat2quat
 from transforms3d.affines import compose, decompose
-import RobotState as RS
 from geometry_msgs.msg import Pose
 
 def htm_to_transform(htm: np.array) -> Transform:
@@ -123,11 +122,11 @@ def detected_obj_pose(T_camObj: Transform):
 # Test functions
 def test():
     manipulator_pos = np.array([
-    [0.0458594, 0.72962853, 0.32706892, 0.2591416],
-    [0.99449429, 0.12350677, 0.26538611, 0.44454056],
-    [0.07726874, 0.25718417, 0.19591819, 0.66401457],
-    [0.0868532, 0.12757232, 0.78079625, 0.92614628]
-])
+        [0.70710678, -0.70710678, 0, 0],
+        [0.70710678, 0.70710678, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ])
     
     tranfrom = htm_to_transform(manipulator_pos)
     htm = transform_to_htm(tranfrom)

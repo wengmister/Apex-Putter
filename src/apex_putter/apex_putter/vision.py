@@ -10,7 +10,6 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
 import tf2_ros
-import tf_transformations
 from geometry_msgs.msg import Transform, TransformStamped
 import apex_putter.transform_operations as transOps
 from apex_putter_interfaces.msg import Detection2D, DetectionArray
@@ -31,17 +30,17 @@ class Vision(Node):
         self.sub_depth = self.create_subscription(
             Image, self._depth_image_topic, self.imageDepthCallback, 1
         )
-        self.sub_info = self.create_subscription(
-            CameraInfo, self._depth_info_topic, self.imageDepthInfoCallback, 1
-        )
-        self.sub1 = self.create_subscription(
-            Image, self._colored_image_topic, self.get_latest_frame, 1
-        )
+        # self.sub_info = self.create_subscription(
+        #     CameraInfo, self._depth_info_topic, self.imageDepthInfoCallback, 1
+        # )
+        # self.sub1 = self.create_subscription(
+        #     Image, self._colored_image_topic, self.get_latest_frame, 1
+        # )
 
         # Known transform from apriltag to robot base
         self.atag_to_rbf_matrix = np.array([
             [0, 1, 0, 0.180],
-            [0, 0, 1, -0.085],
+            [0, 0, 1, -0.095],
             [1, 0, 0, -0.009],
             [0, 0, 0, 1]
         ])
@@ -57,7 +56,12 @@ class Vision(Node):
             '/robot_base_frame',
             10
         )
+
+        # Dynamic broadcaster for robot base frame
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
+
+        # Static broadcaster for robot base frame to actual base frame
+        self.static_broadcaster = tf2_ros.StaticTransformBroadcaster(self)
 
         self.ball_detection_sub = self.create_subscription(
             DetectionArray,
@@ -68,7 +72,7 @@ class Vision(Node):
 
         self.balls_detected_array = None
 
-        self.timer = self.create_timer(1, self.timer_callback)
+        self.timer = self.create_timer(0.001, self.timer_callback)
 
         self.get_logger().info('Vision node started')
 
@@ -107,7 +111,16 @@ class Vision(Node):
         robot_base_transform.transform = self.atag_to_rbf_transform
 
         self.rbf_publisher.publish(robot_base_transform)
-        self.tf_broadcaster.sendTransform(robot_base_transform)
+        self.static_broadcaster.sendTransform(robot_base_transform)
+
+        # Publish a uniform transform from RBF to real robot base
+        rbf_to_base_transform = TransformStamped()
+        rbf_to_base_transform.header.stamp = self.get_clock().now().to_msg()
+        rbf_to_base_transform.header.frame_id = 'robot_base_frame'
+        rbf_to_base_transform.child_frame_id = 'base'
+
+        self.static_broadcaster.sendTransform(rbf_to_base_transform)
+
 
     def ball_detection_callback(self, msg):
         """Callback for ball detection"""
@@ -122,15 +135,41 @@ class Vision(Node):
             balls_detected = np.vstack((balls_detected, ball_detected))
         
         self.balls_detected_array = balls_detected
-        self.get_logger().info(f"Ball detected at {self.balls_detected_array}")
+        # self.get_logger().info(f"Ball detected at {self.balls_detected_array}")
 
     def deproject_ball_xy(self):
         positions = self.rsViewer.get_ball_positions()
         self.get_logger().info(f"Ball positions: {positions}")
 
+    def calculate_cbf(self):
+        # Get transform from camera to robot base
+        try:
+            tf_cam_rbf = self.tf_buffer.lookup_transform(
+                'camera_color_optical_frame',
+                'robot_base_frame',
+                rclpy.time.Time().to_msg(),
+                rclpy.time.Duration(seconds=1)
+            )
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            self.get_logger().error(f"Failed to get transform: {e}")
+            return
+        
+        htm_cam_rbf = transOps.transform_to_htm(tf_cam_rbf.transform)
+        self.get_logger().info(f"Transform from camera to robot base: {htm_cam_rbf}")
+
+        # try:
+        #     tf_rbf_l8 = self.tf_buffer.lookup_transform(
+        #         'base',
+        #         'link8',
+        #         rclpy.time.Time().to_msg(),
+        #         rclpy.time.Duration(seconds=1)
+        #     )
+
+
 
     def timer_callback(self):
         self.publish_rbf()
+        # self.calculate_cbf()
 
 def main(args=None):
     rclpy.init(args=args)
