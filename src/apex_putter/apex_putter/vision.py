@@ -74,7 +74,8 @@ class Vision(Node):
             10
         )
 
-        self.balls_detected_array = None
+        self.balls_detected_array = None # 2d pixel location
+        self.balls_in_camera_frame = None # 3d camera frame location
 
         self.timer = self.create_timer(0.001, self.timer_callback)
 
@@ -185,7 +186,7 @@ class Vision(Node):
 
         self.static_broadcaster.sendTransform(rbf_to_base_transform)
 
-    def depth_point(self, x, y):
+    def deproject_depth_point(self, x, y):
         """
         Convert pixel coordinates to real-world coordinates using depth information.
 
@@ -199,12 +200,6 @@ class Vision(Node):
             Tuple[float, float, float]: Real-world coordinates (x, y, z).
 
         """
-        # self.get_logger().info(f"i went in depth_world function!!!!")
-        # received = (self._latest_depth_img)
-        # self.get_logger().info(f"received: {received}")
-        # self.get_logger().info(f"i went in depth_world function!!!!")
-        # received = (self._latest_depth_img)
-        # self.get_logger().info(f"received: {received}")
         if (
             self.intrinsics
             and self._latest_depth_img is not None
@@ -219,7 +214,6 @@ class Vision(Node):
             result = rs.rs2_deproject_pixel_to_point(self.intrinsics, [x, y], depth)
 
             x_new, y_new, z_new = result[0], result[1], result[2]
-
 
             return x_new, y_new, z_new
 
@@ -238,14 +232,19 @@ class Vision(Node):
         self.balls_detected_array = balls_detected
         # self.get_logger().info(f"Ball detected at {self.balls_detected_array}")
 
-    def deproject_ball_xy(self):
-        positions = self.rsViewer.get_ball_positions()
-        self.get_logger().info(f"Ball positions: {positions}")
+        # Now deproject into 3D
+        balls_camera_frame = np.empty((0, 3))
+        for i in self.balls_detected_array:
+            i_x = i[0]
+            i_y = i[1]
+            x, y, z = self.deproject_depth_point(i_x, i_y)
+            i_array = np.array([x, y, z])
+            balls_camera_frame = np.vstack((balls_camera_frame, i_array))
+        self.balls_in_camera_frame = balls_camera_frame
 
 
     def timer_callback(self):
         self.publish_rbf()
-        # self.calculate_cbf()
 
 def main(args=None):
     rclpy.init(args=args)
