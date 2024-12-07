@@ -1,0 +1,39 @@
+<launch>
+    <!-- Include the Gazebo empty world launch -->
+    <include file="$(find-package-share gazebo_ros)/launch/gazebo.launch.xml">
+        <arg name="world" value="$(find-package-share gazebo_ros)/worlds/empty.world" />
+    </include>
+
+    <!-- Static Transform Publisher -->
+    <node
+        pkg="tf2_ros"
+        exec="static_transform_publisher"
+        name="tf_footprint_base"
+        output="screen">
+        <param name="frame_id" value="base_link" />
+        <param name="child_frame_id" value="base_footprint" />
+        <param name="translation" value="[0, 0, 0]" />
+        <param name="rotation" value="[0, 0, 0]" />
+        <param name="rate" value="40" />
+    </node>
+
+    <!-- Spawn the URDF Model in Gazebo -->
+    <node
+        pkg="gazebo_ros"
+        exec="spawn_entity.py"
+        name="spawn_model"
+        output="screen">
+        <param name="file" value="$(find-package-share golf_club)/urdf/golf_club.urdf" />
+        <param name="entity_name" value="golf_club" />
+    </node>
+
+    <!-- Publish Fake Joint Calibration -->
+    <node
+        pkg="std_msgs"
+        exec="pub"
+        name="fake_joint_calibration"
+        output="screen">
+        <param name="topic_name" value="/calibrated" />
+        <param name="data" value="true" />
+    </node>
+</launch>

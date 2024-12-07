@@ -1,0 +1,26 @@
+<launch>
+    <!-- Load robot description from the URDF file -->
+    <node
+        pkg="robot_state_publisher"
+        exec="robot_state_publisher"
+        name="robot_state_publisher"
+        output="screen">
+        <param name="robot_description" value="$(find-pkg-share golf_club)/urdf/golf_club.urdf" />
+    </node>
+
+    <!-- Launch the Joint State Publisher GUI -->
+    <node
+        pkg="joint_state_publisher_gui"
+        exec="joint_state_publisher_gui"
+        name="joint_state_publisher_gui"
+        output="screen" />
+
+    <!-- Launch RViz -->
+    <node
+        pkg="rviz2"
+        exec="rviz2"
+        name="rviz2"
+        output="screen">
+        <param name="arguments" value="-d $(find-pkg-share golf_club)/urdf.rviz" />
+    </node>
+</launch>
