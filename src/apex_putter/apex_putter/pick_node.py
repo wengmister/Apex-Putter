@@ -12,6 +12,7 @@ from enum import auto, Enum
 from geometry_msgs.msg import Pose
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 import rclpy
+import transform_operations 
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.node import Node
 from std_srvs.srv import Empty
@@ -115,6 +116,7 @@ class PickNode(Node):
 
     async def test_callback(self, request, response):
         """Test."""
+        # transform_operations.detected obj pose -> goal pose.
         await self.MPI.move_arm_pose(goal_pose=self.pose)
         await self.MPI.move_arm_cartesian(waypoints=self.waypoints)
         return response

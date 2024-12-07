@@ -2,12 +2,15 @@ import math
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from enum import Enum, auto
 
-from geometry_msgs.msg import Pose, Quaternion
+from geometry_msgs.msg import Pose, Quaternion, PoseStamped
 from visualization_msgs.msg import Marker
 from std_srvs.srv import Empty
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+
+import tf2_ros
+from tf2_geometry_msgs import PoseStamped as Tf2PoseStamped
 
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 from apex_putter.BallTrajectoryCalc import BallTrajectoryCalculator
@@ -28,29 +31,40 @@ class DemoNode(Node):
         # Initialize motion planning interface
         self.MPI = MotionPlanningInterface(
             node=self,
-            base_frame='base',
+            base_frame='base',  # Adjust if needed
             end_effector_frame='fer_link8'
         )
 
-        # Hard-coded positions for simulation
-        if self.use_simulation_mode:
-            self.ball_position = np.array([0.5, 0.0, 0.0])
-            self.hole_position = np.array([0.8, 0.0, 0.0])
-        else:
-            self.ball_position = np.array([0.5, 0.0, 0.0])
-            self.hole_position = np.array([0.8, 0.0, 0.0])
+        # Hard-coded hole position (for now still fixed)
+        self.hole_position = np.array([0.8, 0.0, 0.0])
+        # Ball position initially hard-coded, will be updated if real-world mode
+        self.ball_position = np.array([0.5, 0.0, 0.0])
 
         self.trajectory_calculator = BallTrajectoryCalculator(self.ball_position, self.hole_position)
 
-        # Define the robot's start pose (Pose only, as in the working example)
+        # Define the robot's start pose
         self.start_pose = Pose()
         self.start_pose.position.x = 0.4
         self.start_pose.position.y = 0.0
         self.start_pose.position.z = 0.4
         self.start_pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
 
-        # Compute the waypoints dynamically from ball to hole
+        # Compute waypoints either from the hard-coded ball/hole or updated positions
         self.waypoints = self.compute_waypoints()
+
+        # TF Buffer and Listener for transforming from camera frame to robot frame
+        # Assuming 'base' is robot frame and 'camera_link' is camera frame
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+
+        # Subscriber to a topic that provides ball position in camera frame (real-world)
+        # If this topic is not available, you can comment it out or adapt
+        self.ball_pose_sub = self.create_subscription(
+            PoseStamped,
+            '/ball_pose_camera',  # Example topic name
+            self.ball_pose_callback,
+            10
+        )
 
         # Internal state machine
         self.state = State.START
@@ -76,14 +90,42 @@ class DemoNode(Node):
         self.ball_acceleration = 0.0
         self.ball_direction = np.array([0.0, 0.0, 0.0])
 
-        # Create a service to trigger the demo
+        # Services:
+        # test_callback: runs the simple simulation demonstration
         self.demo_test_srv = self.create_service(Empty, 'demo_test', self.test_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        # put_callback: executes the entire motion sequence with current ball/hole position (real or simulated)
+        self.put_srv = self.create_service(Empty, 'put', self.put_callback, callback_group=MutuallyExclusiveCallbackGroup())
 
         # Use an asynchronous callback for the timer so we can await coroutines
         self.timer = self.create_timer(0.1, self.timer_callback)
 
-        self.get_logger().info("DemoNode initialized. Waiting for demo_test service call to start demo.")
+        self.get_logger().info("DemoNode initialized. Waiting for demo_test or put service calls to start demo.")
 
+
+    def ball_pose_callback(self, msg: PoseStamped):
+        """
+        Receive ball position in camera frame and transform it into robot frame.
+        Update self.ball_position accordingly if in real-world mode.
+        """
+        if self.use_simulation_mode:
+            # In simulation mode, we ignore real-world TF updates
+            return
+
+        try:
+            # Wait for transform from camera frame to base frame
+            transform = self.tf_buffer.lookup_transform('base', msg.header.frame_id, rclpy.time.Time())
+            # Transform the pose to base frame
+            ps = Tf2PoseStamped(msg)
+            ps_base = tf2_ros.do_transform_pose(ps, transform)
+            # Update ball position in robot frame
+            self.ball_position = np.array([ps_base.pose.position.x, ps_base.pose.position.y, ps_base.pose.position.z])
+            self.get_logger().info(f"Updated ball position in robot frame: {self.ball_position}")
+
+            # Recompute waypoints after updating ball position
+            self.waypoints = self.compute_waypoints()
+
+        except Exception as e:
+            self.get_logger().error(f"Failed to transform ball pose: {e}")
 
     def compute_waypoints(self):
         """Compute waypoints from behind the ball, through the ball, and beyond the hole."""
@@ -114,6 +156,7 @@ class DemoNode(Node):
         return [wp1, wp2, wp3]
 
     def default_waypoints(self):
+        # Fallback if ball/hole coincide
         waypoint1 = Pose()
         waypoint1.position.x = 0.45
         waypoint1.position.y = 0.0
@@ -179,9 +222,25 @@ class DemoNode(Node):
         self.hole_marker_pub.publish(self.hole_marker)
 
     async def test_callback(self, request, response):
+        """
+        Service callback to start the demo using the currently known ball and hole positions (simulation mode).
+        This just executes a Cartesian path from behind the ball through it towards the hole.
+        """
         self.task_step = 0
         self.state = State.TASK
-        self.get_logger().info("Demo started via service call.")
+        self.get_logger().info("Demo (simulation) started via service call.")
+        return response
+
+    async def put_callback(self, request, response):
+        """
+        Another service callback that attempts the entire motion sequence as if putting the ball:
+        In simulation mode, uses hard-coded positions.
+        In real-world mode, expects ball_position to have been updated from TF subscriber.
+        """
+        self.get_logger().info("Received request to put the ball. Attempting full motion sequence...")
+        # Similar logic as test_callback but you can add more steps or different approach if needed
+        self.task_step = 0
+        self.state = State.TASK
         return response
 
     async def timer_callback(self):
@@ -189,7 +248,6 @@ class DemoNode(Node):
             self.state = State.IDLE
 
         elif self.state == State.IDLE:
-            # Just waiting for 'demo_test' to start the task
             pass
 
         elif self.state == State.TASK:
@@ -201,7 +259,7 @@ class DemoNode(Node):
                 )
 
                 if result:
-                    self.get_logger().info("Trajectory executed successfully. Robot should have 'hit.'")
+                    self.get_logger().info("Trajectory executed successfully. Robot should have 'hit' the ball now.")
                     self.task_step += 1
 
                     self.get_logger().info("Animating the ball movement with friction...")
