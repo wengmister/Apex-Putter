@@ -8,7 +8,7 @@ from cv_bridge import CvBridge
 
 class YoloNode(Node):
     """
-    Use Yolo to identify scene objects
+    Use Yolo to identify golf balls
 
     Subscribes
     ----------
