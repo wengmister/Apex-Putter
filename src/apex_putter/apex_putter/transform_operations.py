@@ -118,19 +118,17 @@ def detected_obj_pose(T_camObj: Transform):
     # pose.orientation.w = -5.0747e-06
     return pose
 
-
 # Test functions
 def test():
     manipulator_pos = np.array([
-        [0.70710678, -0.70710678, 0, 0],
-        [0.70710678, 0.70710678, 0, 0],
-        [0, 0, 1, 0],
+        [0.7071, -0.7071, 0, 1],
+        [0.7071, 0.7071, 0, 0.44454056],
+        [0, 0, 1, 0.66401457],
         [0, 0, 0, 1]
     ])
     
-    tranfrom = htm_to_transform(manipulator_pos)
-    htm = transform_to_htm(tranfrom)
+    tranform = htm_to_transform(manipulator_pos)
+    htm = transform_to_htm(tranform)
     print(htm)
-
 
 test()
