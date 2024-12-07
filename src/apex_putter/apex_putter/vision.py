@@ -6,6 +6,8 @@ Author: Zhengyang Kris Weng
 import cv2
 import numpy as np
 import rclpy
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile
+from visualization_msgs.msg import Marker
 from rclpy.node import Node
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
@@ -31,6 +33,7 @@ class Vision(Node):
         self._latest_color_img = None
         self._latest_depth_img = None
 
+        # Image subscribers
         self.sub_depth = self.create_subscription(
             Image, self._depth_image_topic, self.imageDepthCallback, 1
         )
@@ -78,6 +81,11 @@ class Vision(Node):
         self.balls_in_camera_frame = None # 3d camera frame location
 
         self.timer = self.create_timer(0.001, self.timer_callback)
+
+        markerQoS = QoSProfile(
+            depth=10, durability=QoSDurabilityPolicy.VOLATILE)
+        self.ball_marker_publisher = self.create_publisher(
+            Marker, 'ball_marker', markerQoS)
 
         self.get_logger().info('Vision node started')
 
@@ -239,12 +247,67 @@ class Vision(Node):
             i_y = i[1]
             x, y, z = self.deproject_depth_point(i_x, i_y)
             i_array = np.array([x, y, z])
+            i_array = i_array/1000 # Convert to meters
             balls_camera_frame = np.vstack((balls_camera_frame, i_array))
         self.balls_in_camera_frame = balls_camera_frame
 
+    def create_ball_marker(self, x, y, z):
+        """
+        Create a ball marker for RViz.
+
+        Args:
+        ----
+            x (float): X-coordinate.
+            y (float): Y-coordinate.
+            z (float): Z-coordinate.
+
+        Returns
+        -------
+            Marker: Ball marker.
+
+        """
+        marker = Marker()
+        marker.header.frame_id = "camera_color_optical_frame"
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = "ball"
+        marker.id = 0
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+
+        # Position
+        marker.pose.position.x = x
+        marker.pose.position.y = y
+        marker.pose.position.z = z
+
+        # Dimension
+        marker.scale.x = 0.05
+        marker.scale.y = 0.05
+        marker.scale.z = 0.05
+
+        # Color - setting to red
+        marker.color.a = 0.7
+        marker.color.r = 0.8
+        marker.color.g = 0.0
+        marker.color.b = 0.2
+
+        return marker
+
+    def drop_ball_marker(self):
+        """
+        Drop a marker at the detected ball location in RViz.
+        """
+        if self.balls_in_camera_frame is not None:
+            for i in self.balls_in_camera_frame:
+                self.get_logger().info(f"Dropping marker at {i[0], i[1], i[2]}")
+                x = i[0]
+                y = i[1]
+                z = i[2]
+                marker = self.create_ball_marker(x, y, z)
+                self.ball_marker_publisher.publish(marker)
 
     def timer_callback(self):
         self.publish_rbf()
+        self.drop_ball_marker()
 
 def main(args=None):
     rclpy.init(args=args)
