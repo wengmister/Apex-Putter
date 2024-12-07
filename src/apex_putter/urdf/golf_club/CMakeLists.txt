@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 
-project(golb_club_fixed)
+project(golf_club)
 
 find_package(catkin REQUIRED)
 

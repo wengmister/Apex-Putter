@@ -10,7 +10,7 @@
     name="spawn_model"
     pkg="gazebo_ros"
     type="spawn_model"
-    args="-file $(find golb_club_fixed)/urdf/golb_club_fixed.urdf -urdf -model golb_club_fixed"
+    args="-file $(find golf_club)/urdf/golf_club.urdf -urdf -model golf_club"
     output="screen" />
   <node
     name="fake_joint_calibration"

@@ -3,7 +3,7 @@
     name="model" />
   <param
     name="robot_description"
-    textfile="$(find golb_club_fixed)/urdf/golb_club_fixed.urdf" />
+    textfile="$(find golf_club)/urdf/golf_club.urdf" />
   <node
     name="joint_state_publisher_gui"
     pkg="joint_state_publisher_gui"
@@ -16,5 +16,5 @@
     name="rviz"
     pkg="rviz"
     type="rviz"
-    args="-d $(find golb_club_fixed)/urdf.rviz" />
+    args="-d $(find golf_club)/urdf.rviz" />
 </launch>

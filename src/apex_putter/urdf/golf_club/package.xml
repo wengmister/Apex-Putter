@@ -1,10 +1,10 @@
 <package format="2">
-  <name>golb_club_fixed</name>
+  <name>golf_club</name>
   <version>1.0.0</version>
   <description>
-    <p>URDF Description package for golb_club_fixed</p>
+    <p>URDF Description package for golf_club</p>
     <p>This package contains configuration data, 3D models and launch files
-for golb_club_fixed robot</p>
+for golf_club robot</p>
   </description>
   <author>TODO</author>
   <maintainer email="TODO@email.com" />
