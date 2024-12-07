@@ -66,25 +66,21 @@ Methods
 
 """
 
-from geometry_msgs.msg import Pose, PoseStamped, Vector3, Point
+from geometry_msgs.msg import Point, Pose, Vector3
 
 from moveit_msgs.action import ExecuteTrajectory, MoveGroup
 
 from moveit_msgs.msg import BoundingVolume, Constraints, JointConstraint, \
     MotionPlanRequest, MoveItErrorCodes, OrientationConstraint, \
-    PlanningOptions, PositionConstraint, PositionIKRequest, \
+    PlanningOptions, PositionConstraint, \
     RobotState, WorkspaceParameters
 
-from moveit_msgs.srv import GetCartesianPath, GetPositionIK
+from moveit_msgs.srv import GetCartesianPath
 
-import rclpy
 from rclpy.action import ActionClient
 
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.node import Node
-from rclpy.task import Future
 
-from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 
 from std_msgs.msg import Header
@@ -92,13 +88,10 @@ from tf2_ros.buffer import Buffer
 
 from tf2_ros.transform_listener import TransformListener
 
-from .RobotState import RobotState as RS
-
 
 class MotionPlanner():
 
-    def __init__(self, node: Node, base_frame: str, end_effector_frame: str,
-                 joint_state_topic: str, group_name: str, controller: str):
+    def __init__(self, node: Node, base_frame: str, end_effector_frame: str):
         """
         Initialize the MotionPlanner class.
 
@@ -113,35 +106,21 @@ class MotionPlanner():
         """
         self.node = node
 
-        # Create an instance of RS
-        self.robot_state = RS(node, base_frame, end_effector_frame,
-                              joint_state_topic, group_name)
-
         # MoveGroup action client
         self.move_group_action_client = ActionClient(
-            self.node, MoveGroup, '/move_action', callback_group=MutuallyExclusiveCallbackGroup())
+            self.node, MoveGroup, '/move_action')
 
         self.cartesian_path_client = self.node.create_client(
-            GetCartesianPath, 'compute_cartesian_path',
-            callback_group=MutuallyExclusiveCallbackGroup())
+            GetCartesianPath, 'compute_cartesian_path')
 
         self.execute_trajectory_client = ActionClient(
-            self.node, ExecuteTrajectory, 'execute_trajectory',
-            callback_group=MutuallyExclusiveCallbackGroup())
+            self.node, ExecuteTrajectory, 'execute_trajectory')
 
         self.base_frame = base_frame
         self.end_effector_frame = end_effector_frame
-        self.group_name = group_name
-        self.controller = controller
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self.node)
-
-        # Initialize joint state
-        self.joint_state = JointState()
-        # Subscriber to js
-        self.joint_state_subscription = self.node.create_subscription(
-            JointState, joint_state_topic, self.joint_state_callback, 10)
 
         # Franka workspace (or just default 111?)
         self.workspace_min = Vector3(x=-0.855, y=-0.855, z=0.0)
@@ -160,40 +139,9 @@ class MotionPlanner():
         # Saved trajectories
         self.saved_trajectories = {}
 
-    def joint_state_callback(self, msg):
-        """
-        Handle incoming joint state messages and update internal joint state.
-
-        Args:
-        ----
-            msg (JointState): The joint state message.
-
-        """
-        # grabbing the entire joint state msg
-        self.joint_state = msg
-
-    def get_current_robot_state(self):
-        """
-        Get the current robot state.
-
-        Returns
-        -------
-            The current robot state.
-
-        """
-        # Wrap into RobotState
-        robot_state = RobotState()
-        robot_state.joint_state = self.joint_state
-        return robot_state
-
-    def done_callback(self, task):
-        result = task.result()
-        self.future.set_result(result)
-
-    # Need to wrap this in a executor to call it with a method
-
     async def plan_joint_async(self, joint_name, joint_values,
-                               start_state: RobotState = None,
+                               group_name,
+                               start_state: RobotState,
                                max_velocity_scaling_factor=0.1,
                                max_acceleration_scaling_factor=0.1,
                                execute: bool = False):
@@ -218,21 +166,26 @@ class MotionPlanner():
             the planned trajectory
 
         """
-        # get current robot state
-        if start_state is None:
-            start_state = self.get_current_robot_state()
-            self.node.get_logger().info(f'Current robot state: {start_state}')
 
         # define goal joint constriants
         joint_constraints = []
         for i in range(len(joint_name)):
-            constraint_i = JointConstraint(
-                joint_name=joint_name[i],
-                position=joint_values[i],
-                tolerance_above=0.0001,
-                tolerance_below=0.0001
-            )
-            joint_constraints.append(constraint_i)
+            if group_name == 'fer_manipulator':
+                constraint_i = JointConstraint(
+                    joint_name=joint_name[i],
+                    position=joint_values[i],
+                    tolerance_above=0.0001,
+                    tolerance_below=0.0001
+                )
+                joint_constraints.append(constraint_i)
+            elif group_name == 'hand':
+                constraint_i = JointConstraint(
+                    joint_name=joint_name[i],
+                    position=joint_values[i],
+                    tolerance_above=0.0001,
+                    tolerance_below=0.0001
+                )
+                joint_constraints.append(constraint_i)
 
         self.node.get_logger().info(
             f'Goal joint Constraint: {joint_constraints}')
@@ -240,25 +193,44 @@ class MotionPlanner():
         # wrap into GoalConstraints
         goal_constraints = Constraints(joint_constraints=joint_constraints)
 
-        # moveit plan request
-        motion_plan_request = MotionPlanRequest(
-            workspace_parameters=WorkspaceParameters(
-                header=Header(
-                    stamp=self.node.get_clock().now().to_msg(),
-                    frame_id=self.base_frame
-                ),
-                min_corner=self.workspace_min,
-                max_corner=self.workspace_max
-            ),
-            start_state=start_state,
-            goal_constraints=[goal_constraints],
-            group_name=self.group_name,
-            allowed_planning_time=20.0,
-            num_planning_attempts=20,
-            max_velocity_scaling_factor=max_velocity_scaling_factor,
-            max_acceleration_scaling_factor=max_acceleration_scaling_factor,
-        )
+        self.node.get_logger().info(f'{start_state}')
 
+        motion_plan_request = MotionPlanRequest()
+        if group_name == 'fer_manipulator':
+            # moveit plan request
+            motion_plan_request = MotionPlanRequest(
+                workspace_parameters=WorkspaceParameters(
+                    header=Header(
+                        stamp=self.node.get_clock().now().to_msg(),
+                        frame_id=self.base_frame
+                    ),
+                    min_corner=self.workspace_min,
+                    max_corner=self.workspace_max
+                ),
+                start_state=start_state,
+                goal_constraints=[goal_constraints],
+                group_name=group_name,
+                allowed_planning_time=20.0,
+                num_planning_attempts=20,
+                max_velocity_scaling_factor=max_velocity_scaling_factor,
+                max_acceleration_scaling_factor=max_acceleration_scaling_factor,
+            )
+        elif group_name == 'hand':
+            # moveit plan request
+            motion_plan_request = MotionPlanRequest(
+                workspace_parameters=WorkspaceParameters(
+                    header=Header(
+                        stamp=self.node.get_clock().now().to_msg(),
+                        frame_id=self.base_frame
+                    ),
+                ),
+                goal_constraints=[goal_constraints],
+                group_name=group_name,
+                allowed_planning_time=5.0,
+                num_planning_attempts=5,
+            )
+
+        self.node.get_logger().info('Sending goal.')
         # --------------------   Begin Citation [1]   --------------------
         goal = MoveGroup.Goal(
             request=motion_plan_request,
@@ -266,84 +238,33 @@ class MotionPlanner():
                 plan_only=(not execute)
             ),
         )
-        # self.node.get_logger().info(f'Sending goal request: {goal}')
+        self.node.get_logger().info('Goal Sent.')
+
         goal_handle = await self.move_group_action_client.send_goal_async(goal)
-        # self.node.get_logger().info(f'Received response goal handle: \
-        # Accepted? {goal_handle.accepted}')
+        self.node.get_logger().info('Goal handle received.')
         result_response = await goal_handle.get_result_async()
+        self.node.get_logger().info('Result received.')
         result = result_response.result
-        # self.node.get_logger().info(f'Result received: {result}')
         # --------------------  End Citation [1]   --------------------
         error_code = result.error_code
 
         # translate error code in MoveItErrorCodes
         if error_code.val != MoveItErrorCodes.SUCCESS:
-            self.node.get_logger().error(f"Planning failed with error code: {error_code.val}, message: {error_code.message}, source: {error_code.source}")
+            self.node.get_logger().error(f'Planning failed with error code: {
+                error_code.val}, message: {error_code.message}, source: {error_code.source}')
             return None
 
         if execute:
             return result.executed_trajectory
         else:
-            # self.node.get_logger().info(f'Planned trajectory: \
-            # {result.planned_trajectory}')
+            self.node.get_logger().info(f'Planned trajectory: \
+            {result.planned_trajectory}')
             return result.planned_trajectory
 
-    def plan_joint_space(self, joint_name, joint_values,
-                         start_state=None,
-                         max_velocity_scaling_factor=0.1,
-                         max_acceleration_scaling_factor=0.1,
-                         execute=False):
-        """
-        Plan a path from any valid starting joint configuration to any valid goal joint configuration.
-        This is a synchronous wrapper around the asynchronous planning operation.
-
-        Args:
-            joint_name: A list of joint names.
-            joint_values: A list of joint positions to move to.
-            robot_state: The current robot state. Defaults to None.
-            max_velocity_scaling_factor: Velocity scaling factor. \
-                Defaults to 0.1.
-            max_acceleration_scaling_factor: Acceleration scaling factor. \
-                Defaults to 0.1.
-            execute: flag for executing the trajectory. Defaults to False.
-
-        Returns:
-            Future: A future that will contain the planned trajectory when complete.
-
-        Raises:
-            RuntimeError: If there's no executor running or if the action client isn't ready
-        """
-        # Check if we have an executor
-        executor = rclpy.get_global_executor()
-
-        if executor is None:
-            raise RuntimeError(
-                "No executor is running. Make sure rclpy.init() has been called")
-
-        # Create a new future for this request
-        self.future = Future()
-
-        self.node.get_logger().debug(
-            f"Planning joint space trajectory with: {joint_name} to {joint_values}")
-
-        # Create the planning task
-        executor.create_task(
-            self.plan_joint_async(
-                joint_name,
-                joint_values,
-                start_state,
-                max_velocity_scaling_factor,
-                max_acceleration_scaling_factor,
-                execute
-            )
-        ).add_done_callback(self.done_callback)
-
-        self.node.get_logger().info('Task done')
-
-        return self.future
-
-    async def plan_pose_async(self, goal_position=None, goal_orientation=None,
-                              start_pose=None,
+    async def plan_pose_async(self,
+                              group_name,
+                              start_state: RobotState,
+                              goal_position=None, goal_orientation=None,
                               max_velocity_scaling_factor=0.1,
                               max_acceleration_scaling_factor=0.1,
                               execute=False):
@@ -351,7 +272,7 @@ class MotionPlanner():
         Plans and optionally executes robot motion to reach target pose in \
             workspace coordinates.
 
-        Args
+        Args:
         ----
             goal_position (Point): Target position in base frame. \
                 None for orientation-only control.
@@ -366,18 +287,12 @@ class MotionPlanner():
             execute (bool, optional): Execute trajectory if True. \
                 Defaults to False.
 
-        Returns
-        -------
+        Return:
+        ------
             RobotTrajectory: Executed trajectory if execute=True, \
                 otherwise planned trajectory.
 
         """
-        # get current robot state
-        if start_pose is None:
-            start_state = self.get_current_robot_state()
-        else:
-            start_state = await self.robot_state.compute_inverse_kinematics(
-                start_pose)
 
         # define goal constraints
         position_constraints = []
@@ -385,12 +300,12 @@ class MotionPlanner():
 
         # Wrap into point class if provided a list
         if type(goal_position) is not Point:
-            self.node.get_logger().info(f"None point type goal position provided: {
-                type(goal_position)} with val: {goal_position}.")
+            self.node.get_logger().info(f'None point type goal position provided: {
+                type(goal_position)} with val: {goal_position}.')
             goal_position = Point(
                 x=goal_position[0], y=goal_position[1], z=goal_position[2])
             self.node.get_logger().info(
-                f"Converted to point type goal position: {goal_position}")
+                f'Converted to point type goal position: {goal_position}')
 
         # position constraint
         if goal_position is not None:
@@ -412,7 +327,7 @@ class MotionPlanner():
             )
             position_constraints.append(position_constraint)
         # orientation constraint
-        elif goal_orientation is not None:
+        if goal_orientation is not None:
             orientation_constraint = OrientationConstraint(
                 header=Header(
                     frame_id=self.base_frame,
@@ -420,9 +335,9 @@ class MotionPlanner():
                 ),
                 link_name=self.end_effector_frame,
                 orientation=goal_orientation,
-                absolute_x_axis_tolerance=0.1,
-                absolute_y_axis_tolerance=0.1,
-                absolute_z_axis_tolerance=0.1,
+                absolute_x_axis_tolerance=0.0001,
+                absolute_y_axis_tolerance=0.0001,
+                absolute_z_axis_tolerance=0.0001,
                 weight=1.0
             )
             orientation_constraints.append(orientation_constraint)
@@ -432,6 +347,7 @@ class MotionPlanner():
             position_constraints=position_constraints,
             orientation_constraints=orientation_constraints)
 
+        self.node.get_logger().info(f'{goal_constraints}')
         # motion plan request msg
         motion_plan_request = MotionPlanRequest(
             workspace_parameters=WorkspaceParameters(
@@ -444,7 +360,7 @@ class MotionPlanner():
             ),
             start_state=start_state,
             goal_constraints=[goal_constraints],
-            group_name=self.group_name,
+            group_name=group_name,
             allowed_planning_time=20.0,
             num_planning_attempts=20,
             max_velocity_scaling_factor=max_velocity_scaling_factor,
@@ -467,47 +383,16 @@ class MotionPlanner():
         # translate error code in MoveItErrorCodes
         if error_code.val != MoveItErrorCodes.SUCCESS:
             self.node.get_logger().error(
-                f"Planning failed with error code: {error_code.val}")
+                f'Planning failed with error code: {error_code.val}')
             return None
         if execute:
             return result.executed_trajectory
         else:
             return result.planned_trajectory
 
-    def plan_work_space(self, goal_position=None, goal_orientation=None, start_pose=None,
-                        max_velocity_scaling_factor=0.1,
-                        max_acceleration_scaling_factor=0.1,
-                        execute=False):
-        """
-        Plan a path to a pose synchronously.
-
-        This is a synchronous wrapper for the asynchronous \
-            function plan_pose_async.
-
-        Args
-        ----
-            See plan_pose_async for parameter details.
-
-        Returns
-        -------
-            Future: Future containing the RobotTrajectory when completed.
-
-        """
-        self.future = Future()
-
-        # Execute async function as a task
-        result = rclpy.get_global_executor().create_task(self.plan_pose_async(
-            goal_position,
-            goal_orientation,
-            start_pose,
-            max_velocity_scaling_factor,
-            max_acceleration_scaling_factor,
-            execute
-        )).add_done_callback(self.done_callback)
-
-        return self.future
-
-    async def plan_cartesian_path_async(self, waypoints, start_pose=None,
+    async def plan_cartesian_path_async(self, waypoints,
+                                        group_name,
+                                        start_state,
                                         max_velocity_scaling_factor=0.1,
                                         max_acceleration_scaling_factor=0.1,
                                         avoid_collisions=True):
@@ -534,38 +419,31 @@ class MotionPlanner():
                 otherwise 'planned_trajectory'.
 
         """
-        # very hacky method.
         self.node.get_logger().info("Planning cartesian path async")
-        start_state = start_pose
-        # if start_pose is None:
-        #     start_pose = await self.robot_state.get_current_end_effector_pose()
-        #     self.node.get_logger().info(
-        #         f'Current end effector pose: {start_pose}, \
-        #         type: {type(start_pose)}')
-        #     # Check if the transform is available
-        #     if start_pose is None:
-        #         self.node.get_logger().error(
-        #             'Could not get current end effector pose.')
-        #         return None
 
-        # # Convert start_pose to RobotState using IK
-        # start_state = None
-        # if start_pose is not None:
-            # if not isinstance(start_pose, PoseStamped):
-            #     self.node.get_logger().error(f"Invalid type for start_pose: {type(start_pose)}. Expected PoseStamped.")
-            #     return None
-            # else:
-            #     self.node.get_logger().error("yay!!")
+        if start_pose is None:
+            start_pose = await self.robot_state.get_current_end_effector_pose()
+            self.node.get_logger().info(
+                f'Current end effector pose: {start_pose}, \
+                type: {type(start_pose)}')
+            # Check if the transform is available
+            if start_pose is None:
+                self.node.get_logger().error(
+                    'Could not get current end effector pose.')
+                return None
 
-
-            # self.node.get_logger().info(f'No start state provided. \
-            #                             Deriving start state from start pose: \
-            #                             {start_pose}')
-            # start_state = await self.robot_state.compute_inverse_kinematics(start_pose.pose)
-            # if start_state is None:
-            #     self.node.get_logger().error('Failed to convert start_pose to \
-            #                                  RobotState using IK.')
-            #     return None
+        # Convert start_pose to RobotState using IK
+        start_state = None
+        if start_pose is not None:
+            self.node.get_logger().info(f'No start state provided. \
+                                        Deriving start state from start pose: \
+                                        {start_pose}')
+            start_state = await self.robot_state.compute_inverse_kinematics(
+                start_pose)
+            if start_state is None:
+                self.node.get_logger().error('Failed to convert start_pose to \
+                                             RobotState using IK.')
+                return None
 
         self.node.get_logger().info(f"Waypoint: {waypoints}")
 
@@ -580,7 +458,7 @@ class MotionPlanner():
             max_step=0.01,
             max_velocity_scaling_factor=max_velocity_scaling_factor,
             max_acceleration_scaling_factor=max_acceleration_scaling_factor,
-            group_name=self.group_name,
+            group_name=group_name,
             link_name=self.end_effector_frame,
             avoid_collisions=avoid_collisions,
         )
@@ -603,46 +481,6 @@ class MotionPlanner():
                 f'Failed to plan cartesian path:\
                       Error code {response.error_code.val}')
             return None
-
-    def plan_cartesian_path(self, waypoints, start_pose=None,
-                            max_velocity_scaling_factor=0.1,
-                            max_acceleration_scaling_factor=0.1,
-                            avoid_collisions=True):
-        """
-        Wrap plan_cartesian_path_async synchronously.
-
-        Args
-        ----
-            waypoints (list of Pose): List of waypoints to follow in sequence.
-            start_pose (Pose, optional): Starting pose of the robot's \
-                end-effector. Uses current pose if None.
-            max_velocity_scaling_factor (float, optional): Scaling factor for \
-                joint velocity. Defaults to 0.1.
-            max_acceleration_scaling_factor (float, optional): Scaling factor \
-                for joint acceleration. Defaults to 0.1.
-            execute (bool, optional): If True, execute the planned trajectory \
-                immediately. Defaults to False.
-            avoid_collisions (bool, optional): Whether to avoid collisions \
-                during planning. Defaults to True.
-
-        Returns
-        -------
-            Future: Future containing the RobotTrajectory when completed.
-
-        """
-        self.future = Future()
-
-        self.node.get_logger().info("Planning cartesian path synchronous wrapper")
-        result = rclpy.get_global_executor().create_task(
-            self.plan_cartesian_path_async(
-                waypoints,
-                start_pose,
-                max_velocity_scaling_factor,
-                max_acceleration_scaling_factor,
-                avoid_collisions
-            )).add_done_callback(self.done_callback)
-
-        return self.future
 
     def get_named_config(self, named_configuration):
         """
@@ -747,44 +585,8 @@ class MotionPlanner():
         else:
             self.node.get_logger().info(
                 'Planning completed, returning planned or executed trajectory...')
-            self.node.get_logger().info(f"Planned trajectory: {planned_traj}")
+            self.node.get_logger().info(f'Planned trajectory: {planned_traj}')
             return planned_traj
-
-    def plan_to_named_config(self, named_configuration,
-                             start_pose=None,
-                             max_velocity_scaling_factor=0.1,
-                             max_acceleration_scaling_factor=0.1,
-                             execute=False):
-        """
-        Wrap plan_to_named_configuration_async synchronously.
-
-        Args
-        ----
-            named_configuration (str): The name of the target configuration.
-            start_pose (Pose, optional): Starting pose of the robot's \
-                end-effector. Uses current pose if None.
-            execute (bool, optional): Execute the trajectory if True. \
-                Defaults to False.
-
-        Returns
-        -------
-            Future: Future containing the RobotTrajectory when completed.
-
-        """
-        self.future = Future()
-
-        rclpy.get_global_executor().create_task(
-            self.plan_to_named_config_async(
-                named_configuration,
-                start_pose=start_pose,
-                max_velocity_scaling_factor=max_velocity_scaling_factor,
-                max_acceleration_scaling_factor=max_acceleration_scaling_factor,
-                execute=execute
-            )).add_done_callback(self.done_callback)
-
-        self.node.get_logger().info("Sync wrapper task called")
-
-        return self.future
 
     def save_trajectory(self, name, trajectory):
         """
@@ -819,7 +621,7 @@ class MotionPlanner():
                 f"Trajectory '{name}' sadly cannot be found.")
             return None
 
-    async def execute_trajectory_async(self, trajectory):
+    async def execute_trajectory_async(self, trajectory, controller):
         """
         Execute a given trajectory using the ExecuteTrajectory action.
 
@@ -842,7 +644,7 @@ class MotionPlanner():
         # Create a goal message for the ExecuteTrajectory action
         goal_msg = ExecuteTrajectory.Goal()
         goal_msg.trajectory = trajectory
-        goal_msg.controller_names = [self.controller]
+        goal_msg.controller_names = [controller]
 
         # Send the goal to the action server
         goal_handle = await self.execute_trajectory_client.send_goal_async(
@@ -854,29 +656,9 @@ class MotionPlanner():
         # Wait for the result
         result = await goal_handle.get_result_async()
         if result.result.error_code.val == 1:
-            self.node.get_logger().info("Trajectory execution succeeded.")
+            self.node.get_logger().info('Trajectory execution succeeded.')
             return True
 
         else:
             self.node.get_logger().error('Trajectory execution failed.')
             return False
-
-    def execute_trajectory(self, trajectory):
-        """
-        Wrap execute_trajectory_async synchronously.
-
-        Args
-        ----
-            trajectory (RobotTrajectory): The trajectory to execute.
-
-        Returns
-        -------
-            Future: Future converting into the result of the execution.
-
-        """
-        self.future = Future()
-        rclpy.get_global_executor().create_task(
-            self.execute_trajectory_async(trajectory)
-        ).add_done_callback(self.done_callback)
-
-        return self.future

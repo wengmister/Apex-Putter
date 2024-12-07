@@ -1,4 +1,6 @@
 """
+RobotState class tracks the robot state.
+
 The RobotState class manages the robot's state, providing functionality for
 tracking joint states, retrieving the end-effector pose, and performing
 inverse and forward kinematics.
@@ -48,24 +50,22 @@ Methods
 """
 
 
+from geometry_msgs.msg import Point, Pose, PoseStamped
+from moveit_msgs.msg import RobotState as RobotStateObj
+from moveit_msgs.srv import GetPositionFK, GetPositionIK
 import rclpy
-from rclpy.node import Node
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
-from geometry_msgs.msg import Pose, PoseStamped
+from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from moveit_msgs.srv import GetPositionIK, GetPositionFK
-from tf2_ros import Buffer, TransformListener
 from std_msgs.msg import Header
-from moveit_msgs.msg import RobotState as MoveItRobotState, MoveItErrorCodes
+from tf2_ros import Buffer, TransformListener
 
 
 class RobotState:
-    def __init__(self, node: Node, base_frame: str, end_effector_frame: str,
-                 joint_state_topic: str, group_name: str):
+    def __init__(self, node: Node, base_frame: str, end_effector_frame: str):
         self.node = node
         self.base_frame = base_frame
         self.end_effector_frame = end_effector_frame
-        self.group_name = group_name
 
         # Initialize the TF buffer and listener
         self.tf_buffer = Buffer()
@@ -76,27 +76,31 @@ class RobotState:
 
         # Subscribe to the joint state topic
         self.joint_state_subscription = self.node.create_subscription(
-            JointState, joint_state_topic, self.joint_state_callback, 10)
+            JointState, '/joint_states', self.joint_state_callback, 10,
+            callback_group=MutuallyExclusiveCallbackGroup()
+        )
 
         # Create an IK service client
         self.ik_client = self.node.create_client(
-            GetPositionIK, 'compute_ik',
-            callback_group=MutuallyExclusiveCallbackGroup())
+            GetPositionIK, 'compute_ik')
 
         # Create an FK service client
         self.fk_client = self.node.create_client(
-            GetPositionFK, 'compute_fk',
-            callback_group=MutuallyExclusiveCallbackGroup())
+            GetPositionFK, 'compute_fk')
 
     def joint_state_callback(self, msg):
+        """Define a callback function for joint states."""
         self.joint_state = msg
 
-    def get_current_joint_state(self):
-        return self.joint_state
+    def get_robot_state(self):
+        """Retrieve the current joint state."""
+        robot_state = RobotStateObj()
+        robot_state.joint_state = self.joint_state
+        return robot_state
 
     async def get_current_end_effector_pose(self):
         """
-        Retrieves the most up-to-date end-effector pose from the robot.
+        Retrieve the most up-to-date end-effector pose from the robot.
 
         Returns:
             PoseStamped: The current end-effector pose.
@@ -114,33 +118,37 @@ class RobotState:
                 f'Failed to get end-effector pose: {e}')
             return None
 
-    async def compute_inverse_kinematics(self, pose: Pose = None):
-        if pose is None:
+    async def compute_inverse_kinematics(self, group_name, curr_pose: Pose = None):
+        if curr_pose is None:
             self.node.get_logger().error(
                 'Cannot compute IK without a valid pose.')
             return None
 
         ik_request = GetPositionIK.Request()
-        ik_request.ik_request.group_name = self.group_name
-        ik_request.ik_request.pose_stamped = PoseStamped(
-            header=Header(
-                frame_id=self.base_frame,
-                stamp=self.node.get_clock().now().to_msg()
-            ),
-            pose=pose
+        ik_request.ik_request.group_name = group_name
+        ik_request.ik_request.pose_stamped = PoseStamped()
+        ik_request.ik_request.pose_stamped.header = Header(
+            frame_id=self.base_frame,
+            stamp=self.node.get_clock().now().to_msg()
         )
+        ik_request.ik_request.pose_stamped.pose = Pose()
+        ik_request.ik_request.pose_stamped.pose.position = Point()
+        ik_request.ik_request.pose_stamped.pose.position.x = curr_pose.position.x
+        ik_request.ik_request.pose_stamped.pose.position.y = curr_pose.position.y
+        ik_request.ik_request.pose_stamped.pose.position.z = curr_pose.position.z
+        ik_request.ik_request.pose_stamped.pose.orientation = curr_pose.orientation
+
         ik_request.ik_request.ik_link_name = self.end_effector_frame
         ik_request.ik_request.robot_state.joint_state = \
-            self.get_current_joint_state()
+            self.joint_state
 
         # Call the service asynchronously and await the result
-        ik_response_future = self.ik_client.call_async(ik_request)
-        await ik_response_future
-        return ik_response_future.result()
+        ik_response = await self.ik_client.call_async(ik_request)
+        return ik_response.solution
 
     async def compute_forward_kinematics(self, joint_state: JointState = None):
         if joint_state is None:
-            joint_state = self.get_current_joint_state()
+            joint_state = self.joint_state
 
         fk_request = GetPositionFK.Request()
         fk_request.header.frame_id = self.base_frame
@@ -148,6 +156,5 @@ class RobotState:
         fk_request.robot_state.joint_state = joint_state
 
         # Call the service asynchronously and await the result
-        fk_response_future = self.fk_client.call_async(fk_request)
-        await fk_response_future
-        return fk_response_future.result()
+        fk_response = await self.fk_client.call_async(fk_request)
+        return fk_response.result()
