@@ -10,6 +10,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
 import tf2_ros
+import pyrealsense2 as rs
 from geometry_msgs.msg import Transform, TransformStamped
 import apex_putter.transform_operations as transOps
 from apex_putter_interfaces.msg import Detection2D, DetectionArray
@@ -27,15 +28,18 @@ class Vision(Node):
         self._depth_image_topic = "/camera/camera/aligned_depth_to_color/image_raw"
         self._colored_image_topic = "/camera/camera/color/image_raw"
 
+        self._latest_color_img = None
+        self._latest_depth_img = None
+
         self.sub_depth = self.create_subscription(
             Image, self._depth_image_topic, self.imageDepthCallback, 1
         )
-        # self.sub_info = self.create_subscription(
-        #     CameraInfo, self._depth_info_topic, self.imageDepthInfoCallback, 1
-        # )
-        # self.sub1 = self.create_subscription(
-        #     Image, self._colored_image_topic, self.get_latest_frame, 1
-        # )
+        self.sub_depth_info = self.create_subscription(
+            CameraInfo, self._depth_info_topic, self.imageDepthInfoCallback, 1
+        )
+        self.sub_color = self.create_subscription(
+            Image, self._colored_image_topic, self.imageColorCallback, 1
+        )
 
         # Known transform from apriltag to robot base
         self.atag_to_rbf_matrix = np.array([
@@ -101,7 +105,67 @@ class Vision(Node):
             self.get_logger().error("ValueError in imageDepthCallback: {}".format(e))
             return
 
-    
+    def imageDepthInfoCallback(self, cameraInfo):
+        """
+        Obtain depth camera information.
+
+        Args:
+        ----
+            cameraInfo (CameraInfo): Camera information message.
+
+        Returns
+        -------
+            None
+
+        """
+        try:
+            if self.intrinsics:
+                return
+            self.intrinsics = rs.intrinsics()
+            self.intrinsics.width = cameraInfo.width
+            self.intrinsics.height = cameraInfo.height
+            self.intrinsics.ppx = cameraInfo.k[2]
+            self.intrinsics.ppy = cameraInfo.k[5]
+            self.intrinsics.fx = cameraInfo.k[0]
+            self.intrinsics.fy = cameraInfo.k[4]
+            if cameraInfo.distortion_model == "plumb_bob":
+                self.intrinsics.model = rs.distortion.brown_conrady
+            elif cameraInfo.distortion_model == "equidistant":
+                self.intrinsics.model = rs.distortion.kannala_brandt4
+            self.intrinsics.coeffs = [i for i in cameraInfo.d]
+
+            #DEBUG
+            self.scale_factor = self.intrinsics.width / 450
+            self.get_logger().info(f"intrinsics_width: {self.intrinsics.width}, depth_y: { self.intrinsics.height}")
+        except CvBridgeError as e:
+            print(e)
+            return
+        
+    def imageColorCallback(self, data):
+        """
+        # Other resource cleanup if needed
+        Call for the latest color image.
+
+        Args:
+        ----
+            data (Image): Color image message.
+
+        Returns
+        -------
+            None
+
+        """
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+            self._latest_color_img = cv_image
+            self._latest_color_img_ts = data.header.stamp
+        except CvBridgeError as e:
+            print(e)
+            return
+        except ValueError as e:
+            print(e)
+            return
+
     def publish_rbf(self):
         """Publish robot base frame"""
         robot_base_transform = TransformStamped()
@@ -121,6 +185,43 @@ class Vision(Node):
 
         self.static_broadcaster.sendTransform(rbf_to_base_transform)
 
+    def depth_point(self, x, y):
+        """
+        Convert pixel coordinates to real-world coordinates using depth information.
+
+        Args:
+        ----
+            x (int): X-coordinate.
+            y (int): Y-coordinate.
+
+        Returns
+        -------
+            Tuple[float, float, float]: Real-world coordinates (x, y, z).
+
+        """
+        # self.get_logger().info(f"i went in depth_world function!!!!")
+        # received = (self._latest_depth_img)
+        # self.get_logger().info(f"received: {received}")
+        # self.get_logger().info(f"i went in depth_world function!!!!")
+        # received = (self._latest_depth_img)
+        # self.get_logger().info(f"received: {received}")
+        if (
+            self.intrinsics
+            and self._latest_depth_img is not None
+            and self._latest_color_img is not None
+        ):
+
+            depth_x = int(x)
+            depth_y = int(y)       
+            # self.get_logger().info(f"depth_x: {depth_x}, depth_y: {depth_y}")
+            # depth = self._latest_depth_img[depth_x, depth_y]
+            depth = self._latest_depth_img[depth_y, depth_x]
+            result = rs.rs2_deproject_pixel_to_point(self.intrinsics, [x, y], depth)
+
+            x_new, y_new, z_new = result[0], result[1], result[2]
+
+
+            return x_new, y_new, z_new
 
     def ball_detection_callback(self, msg):
         """Callback for ball detection"""
@@ -140,31 +241,6 @@ class Vision(Node):
     def deproject_ball_xy(self):
         positions = self.rsViewer.get_ball_positions()
         self.get_logger().info(f"Ball positions: {positions}")
-
-    def calculate_cbf(self):
-        # Get transform from camera to robot base
-        try:
-            tf_cam_rbf = self.tf_buffer.lookup_transform(
-                'camera_color_optical_frame',
-                'robot_base_frame',
-                rclpy.time.Time().to_msg(),
-                rclpy.time.Duration(seconds=1)
-            )
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-            self.get_logger().error(f"Failed to get transform: {e}")
-            return
-        
-        htm_cam_rbf = transOps.transform_to_htm(tf_cam_rbf.transform)
-        self.get_logger().info(f"Transform from camera to robot base: {htm_cam_rbf}")
-
-        # try:
-        #     tf_rbf_l8 = self.tf_buffer.lookup_transform(
-        #         'base',
-        #         'link8',
-        #         rclpy.time.Time().to_msg(),
-        #         rclpy.time.Duration(seconds=1)
-        #     )
-
 
 
     def timer_callback(self):
