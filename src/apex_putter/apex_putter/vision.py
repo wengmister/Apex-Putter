@@ -298,16 +298,36 @@ class Vision(Node):
         """
         if self.balls_in_camera_frame is not None:
             for i in self.balls_in_camera_frame:
-                self.get_logger().info(f"Dropping marker at {i[0], i[1], i[2]}")
+                # self.get_logger().info(f"Dropping marker at {i[0], i[1], i[2]}")
                 x = i[0]
                 y = i[1]
                 z = i[2]
                 marker = self.create_ball_marker(x, y, z)
                 self.ball_marker_publisher.publish(marker)
 
+    def publish_ball_transform(self):
+        """
+        Publish the transform of the detected ball in the robot base frame.
+        """
+        if self.balls_in_camera_frame is not None:
+            for i in self.balls_in_camera_frame:
+                x = i[0]
+                y = i[1]
+                z = i[2]
+                camera_to_ball_transform = TransformStamped()
+                camera_to_ball_transform.header.stamp = self.get_clock().now().to_msg()
+                camera_to_ball_transform.header.frame_id = 'camera_color_optical_frame'
+                camera_to_ball_transform.child_frame_id = 'ball'
+                camera_to_ball_transform.transform.translation.x = x
+                camera_to_ball_transform.transform.translation.y = y
+                camera_to_ball_transform.transform.translation.z = z
+
+                self.tf_broadcaster.sendTransform(camera_to_ball_transform)    
+
     def timer_callback(self):
         self.publish_rbf()
         self.drop_ball_marker()
+        self.publish_ball_transform()
 
 def main(args=None):
     rclpy.init(args=args)
