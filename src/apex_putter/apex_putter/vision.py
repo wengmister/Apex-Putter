@@ -23,7 +23,7 @@ class Vision(Node):
 
         # Known transform from apriltag to robot base
         self.atag_to_rbf_matrix = np.array([
-            [0, 1, 0, 0.156],
+            [0, 1, 0, 0.180],
             [0, 0, 1, -0.085],
             [1, 0, 0, -0.009],
             [0, 0, 0, 1]

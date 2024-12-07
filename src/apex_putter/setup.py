@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name + '/launch/', ['launch/vision.launch.xml']),
         ('share/' + package_name + '/config/', ['config/apriltag.rviz',
                                                 'launch/pickplace.launch.py',
+                                                'launch/pickplace.launch.py',
                                                 'config/atag_ros.yaml'])
     ],
     install_requires=['setuptools'],
@@ -24,8 +25,11 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            # 'pick_node = apex_putter.pick_node:main',
+            'demo_node = apex_putter.demo_node:main',
             'pick_node = apex_putter.pick_node:main',
             'vision = apex_putter.vision:main',
+            'yolo = apex_putter.yolo:main',
         ],
     },
 )
