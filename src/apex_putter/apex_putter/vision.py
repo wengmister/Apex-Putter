@@ -13,6 +13,7 @@ import tf2_ros
 import tf_transformations
 from geometry_msgs.msg import Transform, TransformStamped
 import apex_putter.transform_operations as transOps
+from apex_putter_interfaces.msg import Detection2D, DetectionArray
 
 
 class Vision(Node):
@@ -42,6 +43,15 @@ class Vision(Node):
         )
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
 
+        self.ball_detection_sub = self.create_subscription(
+            DetectionArray,
+            '/ball_detections',
+            self.ball_detection_callback,
+            10
+        )
+
+        self.ball_xy_image = None
+
         self.timer = self.create_timer(1, self.timer_callback)
 
         self.get_logger().info('Vision node started')
@@ -57,6 +67,21 @@ class Vision(Node):
 
         self.rbf_publisher.publish(robot_base_transform)
         self.tf_broadcaster.sendTransform(robot_base_transform)
+
+    def ball_detection_callback(self, msg):
+        """Callback for ball detection"""
+        # Initialize empty array with 2 columns for x,y coordinates
+        balls_detected = np.empty((0, 2))
+        
+        for detection in msg.detections:  # Note: using msg.points based on your earlier message definition
+            self.get_logger().debug(f"Detected ball at ({detection.x}, {detection.y})")
+            # Create a 1x2 array for the current detection
+            ball_detected = np.array([[detection.x, detection.y]])
+            # Append as a new row
+            balls_detected = np.vstack((balls_detected, ball_detected))
+        
+        self.ball_xy_image = balls_detected
+        self.get_logger().info(f"Ball detected at {self.ball_xy_image}")
 
     def timer_callback(self):
         self.publish_rbf()
