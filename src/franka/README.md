@@ -44,3 +44,11 @@ Source the franka workspace:
 
 Run the demo file:
 * 'ros2 launch franka_fer_moveit_config demo.launch.py'
+
+
+If you get an error [ERROR] [launch]: Caught exception in launch (see debug for traceback): 'capabilities',
+
+Change line 203 in /opt/ros/jazzy/lib/python3.12/site-packages/moveit_configs_utils/launches.py from
+default_value=moveit_config.move_group_capabilities["capabilities"]
+to
+default_value=moveit_config.move_group_capabilities
