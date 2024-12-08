@@ -50,6 +50,7 @@ class DemoNode(Node):
 
         self.hole_position = None
         self.ball_position = None
+        self.v_h2b = None
 
         # Start pose
         self.start_pose = Pose()
@@ -64,7 +65,7 @@ class DemoNode(Node):
         # Services
         self.ready_srv = self.create_service(Empty, 'ready', self.ready_callback, callback_group=MutuallyExclusiveCallbackGroup())
         self.home_srv = self.create_service(Empty, 'home_robot', self.home_callback, callback_group=MutuallyExclusiveCallbackGroup())
-        # self.putt_srv = self.create_service(Empty, 'putt', self.putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.putt_srv = self.create_service(Empty, 'putt', self.putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
 
         # Timer for optional tasks
         # self.timer = self.create_timer(0.1, self.timer_callback)
@@ -113,18 +114,32 @@ class DemoNode(Node):
         self.get_logger().info("Ready requested.")
         self.get_logger().info("=============================================================")
 
-        v_h2b = self.calculate_hole_to_ball_vector()
+        self.v_h2b = self.calculate_hole_to_ball_vector()
 
         self.offset_ball_position(0.58)
         ball_pose = Pose()
-        ball_pose.position.x = self.ball_position[0] + 0.1 * v_h2b[0]
-        ball_pose.position.y = self.ball_position[1] + 0.1 * v_h2b[1]
+        ball_pose.position.x = self.ball_position[0] + 0.1 * self.v_h2b[0]
+        ball_pose.position.y = self.ball_position[1] + 0.1 * self.v_h2b[1]
         ball_pose.position.z = self.ball_position[2]
         # make oritentation vertical downwards
         ball_pose.orientation = Quaternion(x=0.92, y=-0.38, z=0.00035, w=0.0004)
         await self.MPI.move_arm_pose(ball_pose)
         return response
+    
+    async def putt_callback(self, request, response):
+        """Putt the fucking ball"""
+        self.get_logger().info("Putt requested.")
+        self.get_logger().info("=============================================================")
 
+        putt_pose = Pose()
+        putt_pose.position.x = self.ball_position[0] - 0.2 * self.v_h2b[0]
+        putt_pose.position.y = self.ball_position[1] - 0.2 * self.v_h2b[1]
+        putt_pose.position.z = self.ball_position[2]
+        # make oritentation vertical downwards
+        putt_pose.orientation = Quaternion(x=0.92, y=-0.38, z=0.00035, w=0.0004)
+        await self.MPI.move_arm_pose(putt_pose)
+        return response
+    
     def offset_ball_position(self, z):
         """Offset the ball position by z"""
         self.ball_position[2] += z
