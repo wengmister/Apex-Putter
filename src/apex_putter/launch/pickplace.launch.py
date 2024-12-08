@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
 from launch.conditions import IfCondition
 from launch.substitutions import EqualsSubstitution, LaunchConfiguration, \
     PathJoinSubstitution
@@ -15,6 +15,9 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('demo', default_value='true',
                               description='Sets the mode to demo.'),
+        
+        LogInfo(msg=['demo value: ', LaunchConfiguration('demo')]),
+
         Node(
             package='rviz2',
             executable='rviz2',
