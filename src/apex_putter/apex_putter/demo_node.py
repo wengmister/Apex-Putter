@@ -151,7 +151,7 @@ class DemoNode(Node):
         z = p.position.z
 
         # Decrease Z by putter_length (instead of increasing) to move downward
-        z -= self.putter_length
+        # z -= self.putter_length
         # Move X by putter_offset as before (assuming negative x is correct)
         x -= self.putter_offset
 
