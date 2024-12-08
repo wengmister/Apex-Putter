@@ -123,7 +123,7 @@ class DemoNode(Node):
         ball_pose.position.z = self.ball_position[2]
         # make oritentation vertical downwards
         ball_pose.orientation = Quaternion(x=0.92, y=-0.38, z=0.00035, w=0.0004)
-        await self.MPI.move_arm_pose(ball_pose)
+        await self.MPI.move_arm_pose(ball_pose, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.5)
         return response
     
     async def putt_callback(self, request, response):
@@ -137,7 +137,7 @@ class DemoNode(Node):
         putt_pose.position.z = self.ball_position[2]
         # make oritentation vertical downwards
         putt_pose.orientation = Quaternion(x=0.92, y=-0.38, z=0.00035, w=0.0004)
-        await self.MPI.move_arm_pose(putt_pose)
+        await self.MPI.move_arm_pose(putt_pose, max_velocity_scaling_factor=0.8, max_acceleration_scaling_factor=0.8)
         return response
     
     def offset_ball_position(self, z):
