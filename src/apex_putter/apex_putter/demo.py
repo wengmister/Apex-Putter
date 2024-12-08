@@ -88,18 +88,37 @@ class DemoNode(Node):
             self.get_logger().info(f"Ball position: {self.ball_position}")
         except Exception as e:
             self.get_logger().error(f"Failed to look up ball position: {e}")
+
+    def look_up_hole_in_base_frame(self):
+        """Look up the hole position in the base frame"""
+        self.get_logger().info("Looking up hole position in base frame.")
+        try:
+            transform_base_hole = self.tf_buffer.lookup_transform(self.base_frame, self.hole_tag_frame, rclpy.time.Time())
+            self.get_logger().info(f"Transform from {self.hole_tag_frame} to {self.base_frame}: {transform_base_hole}")
+            htm_base_hole = transOps.transform_to_htm(transform_base_hole.transform)
+            self.hole_position = htm_base_hole[:3, 3]
+            self.get_logger().info(f"Hole position: {self.hole_position}")
+        except Exception as e:
+            self.get_logger().error(f"Failed to look up hole position: {e}")
+
+    def calculate_hole_to_ball_vector(self):
+        """Calculate the vector from the hole to the ball"""
+        self.look_up_ball_in_base_frame()
+        self.look_up_hole_in_base_frame()
+        self.hole_position[2] = self.ball_position[2] # flatten the hole position on z-axis
+        return self.ball_position - self.hole_position # vector: hole to ball
         
     async def ready_callback(self, request, response):
         """Prepare the robot for putting"""
         self.get_logger().info("Ready requested.")
         self.get_logger().info("=============================================================")
-        transform_base_l8 = self.tf_buffer.lookup_transform('fer_link8', self.base_frame, rclpy.time.Time())
-        self.get_logger().info(f"Transform from fer_link8 to {self.base_frame}: {transform_base_l8}")
-        self.look_up_ball_in_base_frame()   
+
+        v_h2b = self.calculate_hole_to_ball_vector()
+
         self.offset_ball_position(0.58)
         ball_pose = Pose()
-        ball_pose.position.x = self.ball_position[0]
-        ball_pose.position.y = self.ball_position[1]
+        ball_pose.position.x = self.ball_position[0] + 0.1 * v_h2b[0]
+        ball_pose.position.y = self.ball_position[1] + 0.1 * v_h2b[1]
         ball_pose.position.z = self.ball_position[2]
         # make oritentation vertical downwards
         ball_pose.orientation = Quaternion(x=0.92, y=-0.38, z=0.00035, w=0.0004)
