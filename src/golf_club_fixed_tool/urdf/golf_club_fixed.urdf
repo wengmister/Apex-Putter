@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<robot name="golf_club_fixed">
+
+<link name="base_footprint">
+    <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+            <box size="0.001 0.001 0.001" />
+        </geometry>
+    </visual>
+</link>
+
+<link name="base_link">
+  <inertial>
+    <origin xyz="0.009652 -0.043688 0.054864" rpy="0 0 0" />
+    <mass value="0.131438096507662" />
+    <inertia
+      ixx="0.00440572843646856"
+      ixy="-2.95837561209625E-06"
+      ixz="2.332845454498E-07"
+      iyy="9.47954141231368E-05"
+      iyz="-0.000327658091817243"
+      izz="0.00432935824405533" />
+  </inertial>
+  <visual>
+    <origin xyz="0.009652 -0.043688 0.054864" rpy="0 0 0" />
+    <geometry>
+      <mesh
+        filename="package://golf_club_fixed_tool/meshes/visual/base_link.STL" />
+    </geometry>
+    <material
+      name="">
+      <color
+        rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+    </material>
+  </visual>
+  <collision>
+    <origin xyz="0.009652 -0.043688 0.054864" rpy="0 0 0" />
+    <geometry>
+      <mesh
+        filename="package://golf_club_fixed_tool/meshes/visual/base_link.STL" />
+    </geometry>
+  </collision>
+</link>
+
+<joint name="base_footprint_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="base_footprint"/>
+    <child link="base_link" />
+</joint>
+
+</robot>
