@@ -98,6 +98,20 @@ class RobotState:
         robot_state.joint_state = self.joint_state
         return robot_state
 
+    async def get_transform(self, base_frame, end_frame):
+        try:
+            transform = await self.tf_buffer.lookup_transform_async(
+                base_frame, end_frame, rclpy.time.Time())
+            pose = PoseStamped()
+            pose.header = transform.header
+            pose.pose.position = transform.transform.translation
+            pose.pose.orientation = transform.transform.rotation
+            return pose
+        except Exception as e:
+            self.node.get_logger().error(
+                f'Failed to get end-effector pose: {e}')
+            return None
+
     async def get_current_end_effector_pose(self):
         """
         Retrieve the most up-to-date end-effector pose from the robot.
