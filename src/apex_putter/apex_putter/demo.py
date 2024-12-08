@@ -89,13 +89,26 @@ class DemoNode(Node):
         except Exception as e:
             self.get_logger().error(f"Failed to look up ball position: {e}")
         
-
     async def ready_callback(self, request, response):
         """Prepare the robot for putting"""
         self.get_logger().info("Ready requested.")
-        self.look_up_ball_in_base_frame()
+        self.get_logger().info("=============================================================")
+        transform_base_l8 = self.tf_buffer.lookup_transform('fer_link8', self.base_frame, rclpy.time.Time())
+        self.get_logger().info(f"Transform from fer_link8 to {self.base_frame}: {transform_base_l8}")
+        self.look_up_ball_in_base_frame()   
+        self.offset_ball_position(0.58)
+        ball_pose = Pose()
+        ball_pose.position.x = self.ball_position[0]
+        ball_pose.position.y = self.ball_position[1]
+        ball_pose.position.z = self.ball_position[2]
+        # make oritentation vertical downwards
+        ball_pose.orientation = Quaternion(x=0.92, y=-0.38, z=0.00035, w=0.0004)
+        await self.MPI.move_arm_pose(ball_pose)
         return response
 
+    def offset_ball_position(self, z):
+        """Offset the ball position by z"""
+        self.ball_position[2] += z
 
 def main(args=None):
     rclpy.init(args=args)
