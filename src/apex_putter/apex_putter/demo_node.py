@@ -16,7 +16,6 @@ from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 from apex_putter.BallTrajectoryCalc import BallTrajectoryCalculator
 import apex_putter.transform_operations as transOps
 
-# Import quaternion_from_euler to set orientation (currently not used)
 from tf_transformations import quaternion_from_euler
 
 class State(Enum):
@@ -46,10 +45,8 @@ class DemoNode(Node):
         self.camera_frame = self.get_parameter('camera_frame').get_parameter_value().string_value
 
         # Known offsets:
-        # Putter length ~22.85 in = 0.58 m
-        # Offset from shaft: 0.18 in = ~0.00457 m
-        self.putter_length = 22.85 * 0.0254
-        self.putter_offset = 0.18 * 0.0254
+        self.putter_length = 22.85 * 0.0254  # About 0.58 m
+        self.putter_offset = 0.18 * 0.0254  # About 0.00457 m
 
         # Motion planning interface
         self.MPI = MotionPlanningInterface(
@@ -60,7 +57,8 @@ class DemoNode(Node):
 
         # Hard-coded hole (used in sim mode)
         self.hole_position = np.array([0.8, 0.0, 0.0])
-        self.ball_position = np.array([0.5, 0.0, 0.0])  # Updated in real mode
+        # ball_position is updated if real-world mode
+        self.ball_position = np.array([0.5, 0.0, 0.0])
 
         self.trajectory_calculator = BallTrajectoryCalculator(self.ball_position, self.hole_position)
 
@@ -71,12 +69,12 @@ class DemoNode(Node):
         self.start_pose.position.z = 0.4
         self.start_pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
 
-        # Initial waypoints
-        self.waypoints = self.compute_waypoints()
-
-        # TF setup
+        # TF setup (IMPORTANT: do this before compute_waypoints)
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+
+        # Now we can safely compute waypoints since tf_buffer is ready
+        self.waypoints = self.compute_waypoints()
 
         # State machine
         self.state = State.START
@@ -101,26 +99,10 @@ class DemoNode(Node):
         # Timer for optional tasks
         self.timer = self.create_timer(0.1, self.timer_callback)
 
-        self.get_logger().info("DemoNode initialized. Use '/simulate' for simulation or '/real_putt' for real-world mode.")
+        self.get_logger().info("DemoNode initialized. Use '/simulate' or '/real_putt'.")
 
     def update_real_world_positions(self):
         try:
-            # If direct transforms from base->tag are available, uncomment these:
-            # hole_tf = self.tf_buffer.lookup_transform(self.base_frame, self.hole_tag_frame, rclpy.time.Time())
-            # self.hole_position = np.array([
-            #     hole_tf.transform.translation.x,
-            #     hole_tf.transform.translation.y,
-            #     hole_tf.transform.translation.z
-            # ])
-            #
-            # ball_tf = self.tf_buffer.lookup_transform(self.base_frame, self.ball_tag_frame, rclpy.time.Time())
-            # self.ball_position = np.array([
-            #     ball_tf.transform.translation.x,
-            #     ball_tf.transform.translation.y,
-            #     ball_tf.transform.translation.z
-            # ])
-
-            # Otherwise, use matrix approach:
             base_cam_tf = self.tf_buffer.lookup_transform(self.base_frame, self.camera_frame, rclpy.time.Time())
             cam_hole_tf = self.tf_buffer.lookup_transform(self.camera_frame, self.hole_tag_frame, rclpy.time.Time())
             cam_ball_tf = self.tf_buffer.lookup_transform(self.camera_frame, self.ball_tag_frame, rclpy.time.Time())
@@ -140,19 +122,43 @@ class DemoNode(Node):
         except Exception as e:
             self.get_logger().error(f"Could not update real world positions: {e}")
 
-    # Commenting out the putter offset application for testing
-    # def apply_putter_offset(self, waypoint_pose):
-    #     x = waypoint_pose.position.x
-    #     y = waypoint_pose.position.y
-    #     z = waypoint_pose.position.z
+    def transform_point_to_fer_link8_and_apply_offset(self, target_point_in_base):
+        fer_link8_tf = self.tf_buffer.lookup_transform(self.base_frame, 'fer_link8', rclpy.time.Time())
+        T_base_fer = transOps.transform_to_htm(fer_link8_tf.transform)
+        T_fer_base = np.linalg.inv(T_base_fer)
 
-    #     z = z + self.putter_length
-    #     x = x - self.putter_offset
+        target_hom = np.array([target_point_in_base[0], target_point_in_base[1], target_point_in_base[2], 1.0])
+        target_in_fer = T_fer_base @ target_hom
 
-    #     waypoint_pose.position.x = x
-    #     waypoint_pose.position.y = y
-    #     waypoint_pose.position.z = z
-    #     return waypoint_pose
+        x_fer = target_in_fer[0]
+        y_fer = target_in_fer[1]
+        z_fer = target_in_fer[2]
+
+        # Apply putter offset in fer_link8 frame
+        fer_link8_x = x_fer - self.putter_offset
+        fer_link8_y = y_fer
+        fer_link8_z = z_fer + self.putter_length
+
+        fer_link8_pos_in_fer = np.array([fer_link8_x, fer_link8_y, fer_link8_z, 1.0])
+        fer_link8_pos_in_base = T_base_fer @ fer_link8_pos_in_fer
+
+        return fer_link8_pos_in_base[0:3]
+
+    def apply_putter_offset_in_base(self, p: Pose):
+        # In simulation mode, just apply the offset directly in base frame
+        x = p.position.x
+        y = p.position.y
+        z = p.position.z
+
+        # Decrease Z by putter_length (instead of increasing) to move downward
+        z -= self.putter_length
+        # Move X by putter_offset as before (assuming negative x is correct)
+        x -= self.putter_offset
+
+        p.position.x = x
+        p.position.y = y
+        p.position.z = z
+        return p
 
     def compute_waypoints(self):
         direction = self.hole_position - self.ball_position
@@ -162,32 +168,53 @@ class DemoNode(Node):
             return self.default_waypoints()
 
         unit_dir = direction / distance
+
         behind_ball_pos = self.ball_position - unit_dir * 0.05
         at_ball_pos = self.ball_position
         beyond_hole_pos = self.hole_position + unit_dir * 0.05
+
+        roll = math.pi
+        pitch = 0.0
+        yaw = 0.0
+        qx, qy, qz, qw = quaternion_from_euler(roll, pitch, yaw)
 
         def make_pose(x, y, z):
             p = Pose()
             p.position.x = float(x)
             p.position.y = float(y)
             p.position.z = float(z)
-            # Keep orientation as identity, assuming fer_link8 is already oriented correctly
-            p.orientation.w = 1.0
-            p.orientation.x = 0.0
-            p.orientation.y = 0.0
-            p.orientation.z = 0.0
+            p.orientation.x = qx
+            p.orientation.y = qy
+            p.orientation.z = qz
+            p.orientation.w = qw
             return p
 
-        z_height = 0.4
-        wp1 = make_pose(behind_ball_pos[0], behind_ball_pos[1], z_height)
-        wp2 = make_pose(at_ball_pos[0], at_ball_pos[1], z_height)
-        wp3 = make_pose(beyond_hole_pos[0], beyond_hole_pos[1], z_height)
+        if self.use_simulation_mode:
+            # Simulation mode: apply offset directly in base frame
+            wp1 = make_pose(behind_ball_pos[0], behind_ball_pos[1], 0.4)
+            wp2 = make_pose(at_ball_pos[0], at_ball_pos[1], 0.4)
+            wp3 = make_pose(beyond_hole_pos[0], beyond_hole_pos[1], 0.4)
 
-        # Commenting out putter offset for testing
-        # if not self.use_simulation_mode:
-        #     wp1 = self.apply_putter_offset(wp1)
-        #     wp2 = self.apply_putter_offset(wp2)
-        #     wp3 = self.apply_putter_offset(wp3)
+            wp1 = self.apply_putter_offset_in_base(wp1)
+            wp2 = self.apply_putter_offset_in_base(wp2)
+            wp3 = self.apply_putter_offset_in_base(wp3)
+        else:
+            # Real world mode: use TF-based approach
+            def make_pose_from_point_in_base(target_point):
+                fer_link8_pos_in_base = self.transform_point_to_fer_link8_and_apply_offset(target_point)
+                p = Pose()
+                p.position.x = float(fer_link8_pos_in_base[0])
+                p.position.y = float(fer_link8_pos_in_base[1])
+                p.position.z = float(fer_link8_pos_in_base[2])
+                p.orientation.x = qx
+                p.orientation.y = qy
+                p.orientation.z = qz
+                p.orientation.w = qw
+                return p
+
+            wp1 = make_pose_from_point_in_base(behind_ball_pos)
+            wp2 = make_pose_from_point_in_base(at_ball_pos)
+            wp3 = make_pose_from_point_in_base(beyond_hole_pos)
 
         return [wp1, wp2, wp3]
 
@@ -258,6 +285,7 @@ class DemoNode(Node):
         if not self.use_simulation_mode:
             self.get_logger().warn("simulate service called, but simulation_mode is False.")
         self.get_logger().info("Simulation started.")
+        self.waypoints = self.compute_waypoints()
         success = await self.run_motion_sequence()
         if success:
             self.get_logger().info("Simulation done.")
@@ -271,9 +299,7 @@ class DemoNode(Node):
             return response
 
         self.get_logger().info("Real-world putt requested.")
-        # Update real-world positions from TF
         self.update_real_world_positions()
-        # Recompute waypoints
         self.waypoints = self.compute_waypoints()
 
         self.get_logger().info("Executing real-world motion sequence...")
@@ -344,7 +370,6 @@ class DemoNode(Node):
         self.ball_animation_time += self.ball_animation_dt
 
     def timer_callback(self):
-        # You can leave this empty if no periodic tasks are needed
         if self.state == State.START:
             self.state = State.IDLE
 
