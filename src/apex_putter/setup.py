@@ -12,6 +12,8 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch/', ['launch/vision.launch.xml']),
         ('share/' + package_name + '/config/', ['config/apriltag.rviz',
+                                                'config/moveit.rviz',
+                                                'launch/demo.launch.py',
                                                 'launch/pickplace.launch.py',
                                                 'config/atag_ros.yaml'])
     ],
