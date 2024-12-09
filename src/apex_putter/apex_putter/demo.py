@@ -171,7 +171,7 @@ class DemoNode(Node):
         unit_vector = v_b2p / norm_ang
         # Reverse direction
         opposite_vector = -unit_vector
-        putting_angle = -norm_ang
+        putting_angle = norm_ang + np.pi
 
         # Axis-angle to quaternion
         # axis = [0, 0, 1]  # Rotation about the Z-axis
@@ -214,10 +214,10 @@ class DemoNode(Node):
         ready_pose.position.x = pose_wrt_ee[0]
         ready_pose.position.y = pose_wrt_ee[1]
         ready_pose.position.z = pose_wrt_ee[2]
-        # ready_pose.orientation = orientation
+        ready_pose.orientation = orientation
 
         # keeping orientation constant.
-        ready_pose.orientation = self.transform_base_ee.transform.rotation
+        # ready_pose.orientation = self.transform_base_ee.transform.rotation
         self.get_logger().info(f"================== orientation: {ready_pose.orientation} ===========================================")
 
         self.get_logger().info("================== Await mpi starts ===========================================")
