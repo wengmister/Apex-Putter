@@ -246,6 +246,9 @@ class Vision(Node):
             i_x = i[0]
             i_y = i[1]
             x, y, z = self.deproject_depth_point(i_x, i_y)
+            # deprojected to ball centre.
+            radius = 2.1
+            transOps.deproject_ball_pose(dx=x,dy=y,dz=z,R=radius)
             i_array = np.array([x, y, z])
             i_array = i_array/1000 # Convert to meters
             balls_camera_frame = np.vstack((balls_camera_frame, i_array))
