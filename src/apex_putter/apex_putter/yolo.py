@@ -50,7 +50,7 @@ class YoloNode(Node):
             # Check if any of the detected objects is a person
             for box in result.boxes:
                 x, y, w, h = box.xywh[0]  # center x, center y, width, height\
-                self.get_logger().info(f"Detected object at ({x}, {y}) with width {w} and height {h}")
+                self.get_logger().debug(f"Detected object at ({x}, {y}) with width {w} and height {h}")
                 center_x = int(x)
                 center_y = int(y)
 

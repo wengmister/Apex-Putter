@@ -15,6 +15,7 @@ setup(
                                                 'config/moveit.rviz',
                                                 'launch/demo.launch.py',
                                                 'launch/pickplace.launch.py',
+                                                'launch/pickplace.launch.py',
                                                 'config/atag_ros.yaml'])
     ],
     install_requires=['setuptools'],

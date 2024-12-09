@@ -6,6 +6,7 @@ from transforms3d.affines import compose, decompose
 import apex_putter.RobotState as RS
 from geometry_msgs.msg import Pose
 
+
 def htm_to_transform(htm: np.array) -> Transform:
     """
     Convert a HTM to a Transform object
@@ -13,7 +14,7 @@ def htm_to_transform(htm: np.array) -> Transform:
     # Decompose the result
     translation, rotation, _, _ = decompose(htm)
     quaternion = mat2quat(rotation)  # Returns w,x,y,z
-    
+
     # Create and populate result transform
     result = Transform()
     result.translation.x = float(translation[0])
@@ -25,6 +26,7 @@ def htm_to_transform(htm: np.array) -> Transform:
     result.rotation.z = float(quaternion[3])
 
     return result
+
 
 def transform_to_htm(transform: Transform) -> np.array:
     '''
@@ -46,18 +48,19 @@ def transform_to_htm(transform: Transform) -> np.array:
     ])
     rotation_matrix = quat2mat(quaternion)
     htm = np.eye(4)
-    htm[0:3, 0:3] = rotation_matrix 
-    htm[0:3, 3] = translation 
+    htm[0:3, 0:3] = rotation_matrix
+    htm[0:3, 3] = translation
     return htm
+
 
 def combine_transforms(known_matrix: np.array, tag_transform: TransformStamped) -> Transform:
     """
     Combines a known transform matrix with a TF2 transform in ROS2
-    
+
     Args:
         known_transform (4x4 np.array): A known homogeneous transformation matrix.
         tf2_transform (TransformStamped): Transform from TF2
-        
+
     Returns:
         Transform: The resulting combined transform
     """
@@ -76,13 +79,14 @@ def combine_transforms(known_matrix: np.array, tag_transform: TransformStamped) 
     ])
     tf2_scale = np.ones(3)
     tf2_matrix = compose(tf2_translation, tf2_rotation, tf2_scale)
-    
+
     # Combine transforms through matrix multiplication
     result_matrix = np.matmul(tf2_matrix, known_matrix)
-    
+
     result = htm_to_transform(result_matrix)
-    
+
     return result
+
 
 def obj_in_bot_frame(T_camObj):
     '''
@@ -92,8 +96,9 @@ def obj_in_bot_frame(T_camObj):
     '''
     # Write the fixed frame transform here.
     T_botCam = np.array([0])
-    T_objBot = np.dot(np.linalg.inv(T_camObj),np.linalg.inv(T_botCam))
+    T_objBot = np.dot(np.linalg.inv(T_camObj), np.linalg.inv(T_botCam))
     return T_objBot
+
 
 def detected_obj_pose(T_camObj: Transform):
     '''
@@ -109,9 +114,9 @@ def detected_obj_pose(T_camObj: Transform):
     T_camObj = transform_to_htm(T_camObj)
     T_objBot = obj_in_bot_frame(T_camObj)
     pose = Pose()
-    pose.position.x = T_objBot[0,3]
-    pose.position.y = T_objBot[1,3]
-    pose.position.z = T_objBot[2,3]
+    pose.position.x = T_objBot[0, 3]
+    pose.position.y = T_objBot[1, 3]
+    pose.position.z = T_objBot[2, 3]
     # Figure a way to calc optimal orientation
     # pose.orientation.x = 0.90305
     # pose.orientation.y = 0.429622
@@ -119,18 +124,19 @@ def detected_obj_pose(T_camObj: Transform):
     # pose.orientation.w = -5.0747e-06
     return pose
 
-
 # Test functions
+
+
 def test():
     manipulator_pos = np.array([
-    [0.0458594, 0.72962853, 0.32706892, 0.2591416],
-    [0.99449429, 0.12350677, 0.26538611, 0.44454056],
-    [0.07726874, 0.25718417, 0.19591819, 0.66401457],
-    [0.0868532, 0.12757232, 0.78079625, 0.92614628]
-])
-    
-    tranfrom = htm_to_transform(manipulator_pos)
-    htm = transform_to_htm(tranfrom)
+        [0.7071, -0.7071, 0, 1],
+        [0.7071, 0.7071, 0, 0.44454056],
+        [0, 0, 1, 0.66401457],
+        [0, 0, 0, 1]
+    ])
+
+    tranform = htm_to_transform(manipulator_pos)
+    htm = transform_to_htm(tranform)
     print(htm)
 
 
