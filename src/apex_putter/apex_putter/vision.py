@@ -48,9 +48,11 @@ class Vision(Node):
         self.atag_to_rbf_matrix = np.array([
             [0, 1, 0, 0.180],
             [0, 0, 1, -0.095],
-            [1, 0, 0, -0.009],
+            [1, 0, 0, -0.075],
             [0, 0, 0, 1]
         ])
+
+        self.ball_radius = 21 # mm
 
         self.atag_to_rbf_transform = transOps.htm_to_transform(self.atag_to_rbf_matrix)
 
@@ -247,8 +249,7 @@ class Vision(Node):
             i_y = i[1]
             x, y, z = self.deproject_depth_point(i_x, i_y)
             # deprojected to ball centre.
-            radius = 2.03
-            x,y,z = transOps.deproject_ball_pose(dx=x,dy=y,dz=z,R=radius)
+            x,y,z = transOps.deproject_ball_pose(dx=x,dy=y,dz=z,R=self.ball_radius)
             i_array = np.array([x, y, z])
             i_array = i_array/1000 # Convert to meters
             balls_camera_frame = np.vstack((balls_camera_frame, i_array))

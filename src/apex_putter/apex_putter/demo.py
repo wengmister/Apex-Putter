@@ -45,7 +45,7 @@ class DemoNode(Node):
         self.goal_ball_radius = 2.03
         self.putface_ee_transform =  np.array([ [1, 0, 0, 0],
                                                 [0, 1, 0, 0],
-                                                [0, 0, 1, -0.53],
+                                                [0, 0, 1, -0.56],
                                                 [0, 0, 0, 1]])
         # Motion planning interface
         self.MPI = MotionPlanningInterface(

@@ -5,6 +5,7 @@ from geometry_msgs.msg import Transform, TransformStamped
 from transforms3d.quaternions import quat2mat, mat2quat
 from transforms3d.affines import compose, decompose
 from geometry_msgs.msg import Pose
+import math
 
 def htm_to_transform(htm: np.array) -> Transform:
     """
@@ -119,7 +120,7 @@ def detected_obj_pose(T_camObj: Transform):
     # pose.orientation.w = -5.0747e-06
     return pose
 
-def deproject_ball_pose(dx,dy,dz, R=2.03):
+def deproject_ball_pose(dx,dy,dz, R=21):
     '''
     Input:
         (x_c, y_c, z_c) : camera pose
