@@ -66,6 +66,7 @@ class DemoNode(Node):
         self.get_logger().info("Home requested.")
         await self.MPI.move_arm_joints(joint_values=[0.0, -0.4, 0.0, -1.6, 0.0, 1.57, 0.0])
         self.goal_club_tf()
+        self.goal_ee_tf()
         return response
     
     def look_up_ball_in_base_frame(self):
@@ -114,13 +115,31 @@ class DemoNode(Node):
         t.header.frame_id = 'base'
         t.child_frame_id = 'goal_face'
 
-        t.transform.translation.x = self.ball_position[0]
-        t.transform.translation.y = self.ball_position[1]
+        t.transform.translation.x = self.ball_position[0] + club_face_position[0]
+        t.transform.translation.y = self.ball_position[1] + club_face_position[1]
         t.transform.translation.z = self.ball_position[2]
         t.transform.rotation.x = club_face_orientation[0]
         t.transform.rotation.y = club_face_orientation[1]
         t.transform.rotation.z = club_face_orientation[2]
         t.transform.rotation.w = club_face_orientation[3]
+
+        self.tf_static_broadcaster.sendTransform(t)
+
+    def goal_ee_tf(self):
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'goal_face'
+        t.child_frame_id = 'goal_ee'
+
+        t.transform.translation.x = 0.0
+        t.transform.translation.y = 0.0
+        t.transform.translation.z = 0.6
+        
+        dummy_orientation = quaternion_from_euler(np.pi, 0.0, 0.0)
+        t.transform.rotation.x = dummy_orientation[0]
+        t.transform.rotation.y = dummy_orientation[1]
+        t.transform.rotation.z = dummy_orientation[2]
+        t.transform.rotation.w = dummy_orientation[3]
 
         self.tf_static_broadcaster.sendTransform(t)
         
