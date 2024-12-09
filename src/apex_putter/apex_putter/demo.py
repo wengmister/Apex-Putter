@@ -1,11 +1,7 @@
-import math
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from enum import Enum, auto
-
 from geometry_msgs.msg import Pose, Quaternion
-from visualization_msgs.msg import Marker
 from std_srvs.srv import Empty
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
@@ -27,13 +23,11 @@ class DemoNode(Node):
         # Declare parameters for frames
         self.declare_parameter('ball_tag_frame', 'ball')
         self.declare_parameter('hole_tag_frame', 'tag_15')
-        self.declare_parameter('robot_base_tag_frame', 'robot_base_tag')
         self.declare_parameter('base_frame', 'robot_base_frame')
         self.declare_parameter('camera_frame', 'camera_link')
 
         self.ball_tag_frame = self.get_parameter('ball_tag_frame').get_parameter_value().string_value
         self.hole_tag_frame = self.get_parameter('hole_tag_frame').get_parameter_value().string_value
-        self.robot_base_tag_frame = self.get_parameter('robot_base_tag_frame').get_parameter_value().string_value
         self.base_frame = self.get_parameter('base_frame').get_parameter_value().string_value
         self.camera_frame = self.get_parameter('camera_frame').get_parameter_value().string_value
 
@@ -51,13 +45,6 @@ class DemoNode(Node):
         self.hole_position = None
         self.ball_position = None
         self.v_h2b = None
-
-        # Start pose
-        self.start_pose = Pose()
-        self.start_pose.position.x = 0.4
-        self.start_pose.position.y = 0.0
-        self.start_pose.position.z = 0.4
-        self.start_pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -116,7 +103,7 @@ class DemoNode(Node):
 
         self.v_h2b = self.calculate_hole_to_ball_vector()
 
-        self.offset_ball_position(0.58)
+        self.offset_ball_position(0.60)
         ball_pose = Pose()
         ball_pose.position.x = self.ball_position[0] + 0.1 * self.v_h2b[0]
         ball_pose.position.y = self.ball_position[1] + 0.1 * self.v_h2b[1]
