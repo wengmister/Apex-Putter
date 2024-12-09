@@ -82,7 +82,7 @@ class Vision(Node):
         self.balls_detected_array = None # 2d pixel location
         self.balls_in_camera_frame = None # 3d camera frame location
 
-        self.timer = self.create_timer(0.001, self.timer_callback)
+        self.timer = self.create_timer(0.01, self.timer_callback)
 
         markerQoS = QoSProfile(
             depth=10, durability=QoSDurabilityPolicy.VOLATILE)

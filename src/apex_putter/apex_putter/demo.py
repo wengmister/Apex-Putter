@@ -4,7 +4,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Pose, Quaternion
 from std_srvs.srv import Empty
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
-
+from geometry_msgs.msg import TransformStamped
 import tf2_ros
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 import apex_putter.transform_operations as transOps
@@ -48,6 +48,9 @@ class DemoNode(Node):
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
+        # Static broadcaster for ball and club face
+        self.tf_static_broadcaster = tf2_ros.StaticTransformBroadcaster(self)
+
         # Services
         self.ready_srv = self.create_service(Empty, 'ready', self.ready_callback, callback_group=MutuallyExclusiveCallbackGroup())
         self.home_srv = self.create_service(Empty, 'home_robot', self.home_callback, callback_group=MutuallyExclusiveCallbackGroup())
@@ -62,6 +65,7 @@ class DemoNode(Node):
         """Make the robot go to home pose"""
         self.get_logger().info("Home requested.")
         await self.MPI.move_arm_joints(joint_values=[0.0, -0.4, 0.0, -1.6, 0.0, 1.57, 0.0])
+        self.goal_club_tf()
         return response
     
     def look_up_ball_in_base_frame(self):
@@ -94,6 +98,31 @@ class DemoNode(Node):
         self.look_up_hole_in_base_frame()
         self.hole_position[2] = self.ball_position[2] # flatten the hole position on z-axis
         return self.ball_position - self.hole_position # vector: hole to ball
+    
+    def goal_club_tf(self):
+        radius = 0.045
+        ball_hole_vec = -self.calculate_hole_to_ball_vector()
+        theta_hole_ball = np.arctan2(ball_hole_vec[1], ball_hole_vec[0])
+        ball_hole_mag = np.linalg.norm(ball_hole_vec)
+        ball_hole_unit = ball_hole_vec / ball_hole_mag
+        club_face_position = -radius * ball_hole_unit
+        club_face_orientation = quaternion_from_euler(
+            0.0, 0.0, theta_hole_ball)
+        t = TransformStamped()
+
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'base'
+        t.child_frame_id = 'goal_face'
+
+        t.transform.translation.x = self.ball_position[0]
+        t.transform.translation.y = self.ball_position[1]
+        t.transform.translation.z = self.ball_position[2]
+        t.transform.rotation.x = club_face_orientation[0]
+        t.transform.rotation.y = club_face_orientation[1]
+        t.transform.rotation.z = club_face_orientation[2]
+        t.transform.rotation.w = club_face_orientation[3]
+
+        self.tf_static_broadcaster.sendTransform(t)
         
     async def ready_callback(self, request, response):
         """Prepare the robot for putting"""
