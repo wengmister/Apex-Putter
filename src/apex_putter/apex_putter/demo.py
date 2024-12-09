@@ -9,10 +9,10 @@ import tf2_ros
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros import TransformBroadcaster
+import time
 
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 import apex_putter.transform_operations as transOps
-
 
 from tf_transformations import quaternion_from_euler
 
@@ -42,12 +42,10 @@ class DemoNode(Node):
         # Dimentions:(in m)
         self.puttface_dim = [0.1,0.02,0.028]
         self.goal_ball_radius = 2.03
-        # testing vals.
         self.putface_ee_transform =  np.array([ [1, 0, 0, 0],
                                                 [0, 1, 0, 0],
                                                 [0, 0, 1, -0.53],
                                                 [0, 0, 0, 1]])
-
         # Motion planning interface
         self.MPI = MotionPlanningInterface(
             node=self,
@@ -88,8 +86,6 @@ class DemoNode(Node):
         T_be = transOps.transform_to_htm(transform_base_ee.transform)
         T_ep = self.putface_ee_transform
         T_pb = np.dot(np.linalg.inv(T_ep),np.linalg.inv(T_be))
-        self.get_logger().info(f"=============================T_pb::  {T_pb}================================")
-
         T = transOps.htm_to_transform(T_pb)
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
@@ -118,7 +114,9 @@ class DemoNode(Node):
             self.ball_position = htm_base_ball[:3, 3]
             self.get_logger().info(f"Ball position: {self.ball_position}")
         except Exception as e:
-            self.get_logger().error(f"Failed to look up ball position: {e}")
+            self.ball_position = [0.60659744, -0.04259332,  0.05297366]
+            self.get_logger().error(f"Failed to look up ball position, setting fallback value: {e}")
+            self.get_logger().info(f"Fallback Ball position: {self.ball_position}")
 
     def look_up_hole_in_base_frame(self):
         """Look up the hole position in the base frame"""
@@ -130,24 +128,24 @@ class DemoNode(Node):
             self.hole_position = htm_base_hole[:3, 3]
             self.get_logger().info(f"Hole position: {self.hole_position}")
         except Exception as e:
-            self.get_logger().error(f"Failed to look up hole position: {e}")
-
+            self.hole_position = [0.72347078, 0.29201838, 0.05362293]
+            self.get_logger().error(f"Failed to look up hole position, setting fallback value: {e}")
+            self.get_logger().info(f"Fallback Hole position: {self.hole_position}")
+    
     def calculate_hole_to_ball_vector(self):
         """Calculate the vector from the hole to the ball"""
         self.look_up_ball_in_base_frame()
         self.look_up_hole_in_base_frame()
         self.hole_position[2] = self.ball_position[2] # flatten the hole position on z-axis
-        return self.ball_position - self.hole_position # vector: hole to ball
+        return [b - h for b, h in zip(self.ball_position, self.hole_position)]  # vector: hole to ball
 
     def calculate_ball_to_puttface_vector(self, v_h2b, putting_distance = 0.1):
         '''
             Calculate the vector from the centre of ball to the centre of puttface.
-
             Args: 
                 v_h2b = vector from hole to ball.
                 putting_distance (Optional) : the distance in direction of 
                                     putting where the robot would be positioned to start the swing action.
-
             Returns: The pose of the putterface to start the swing.
         '''        
         dx = v_h2b[0]
@@ -191,19 +189,33 @@ class DemoNode(Node):
         self.v_b2p = self.calculate_ball_to_puttface_vector(self.v_h2b)   
         pose_wrt_putface = np.zeros(3)
         pose_wrt_putface[0] = self.ball_position[0] + self.v_b2p[0]
-        pose_wrt_putface[1] = self.ball_position[1] + self.v_b2p[1]
-        pose_wrt_putface[2]= self.ball_position[2] + self.v_b2p[2]
+        pose_wrt_putface[1] = self.ball_position[1] + self.v_b2p[1] 
+        pose_wrt_putface[2]= self.ball_position[2] + self.v_b2p[2] + 0.53  #translated to make it wrt ee
 
         # Puttface to ee transform
         pose_wrt_putface_homogeneous = np.append(pose_wrt_putface, 1).reshape(1, 4)
-        pose_wrt_ee = pose_wrt_putface_homogeneous * self.putface_ee_transform
+        self.get_logger().info(f"\n ========================== self.putface_ee_transform { self.putface_ee_transform}===================================")
+
+        pose_wrt_ee = pose_wrt_putface
+        # pose_wrt_ee = np.dot(pose_wrt_putface_homogeneous, self.putface_ee_transform)
+        self.get_logger().info(f"==========================pose_wrt_ee {pose_wrt_ee} and z is {pose_wrt_ee[2]} ===================================")
 
         orientation = self.calculate_putting_orientation(self.v_b2p)
         ready_pose = Pose()
+        # to test
+        # pose_wrt_ee = [0.5,0,0.590]
         ready_pose.position.x = pose_wrt_ee[0]
         ready_pose.position.y = pose_wrt_ee[1]
         ready_pose.position.z = pose_wrt_ee[2]
-        ready_pose.orientation = orientation
+        # ready_pose.orientation = orientation
+
+        # keeping orientation constant.
+        ready_pose.orientation = self.transform_base_ee.transform.rotation
+        self.get_logger().info(f"================== orientation: {ready_pose.orientation} ===========================================")
+
+        self.get_logger().info("================== Await mpi starts ===========================================")
+        # sleep to prevent oscillation btw quat angles - need to understand
+        time.sleep(3)
         await self.MPI.move_arm_pose(ready_pose, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.5)
         return response
     
