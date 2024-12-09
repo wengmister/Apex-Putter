@@ -1,14 +1,18 @@
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Pose, Quaternion
+from geometry_msgs.msg import Pose, Quaternion, TransformStamped
 from std_srvs.srv import Empty
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 import math
 import tf2_ros
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+from tf2_ros import TransformBroadcaster
 
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 import apex_putter.transform_operations as transOps
+
 
 from tf_transformations import quaternion_from_euler
 
@@ -41,7 +45,7 @@ class DemoNode(Node):
         # testing vals.
         self.putface_ee_transform =  np.array([ [1, 0, 0, 0],
                                                 [0, 1, 0, 0],
-                                                [0, 0, 1, 0.53],
+                                                [0, 0, 1, -0.53],
                                                 [0, 0, 0, 1]])
 
         # Motion planning interface
@@ -58,13 +62,19 @@ class DemoNode(Node):
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
+        # Dynamic transform brodcaster for putter-face.
+        self.tf_dynamic_broadcaster = TransformBroadcaster(self)
+        # If not looked up
+        self.transform_base_ee = TransformStamped()
+        self.transform_base_ee.header.stamp = self.get_clock().now().to_msg()
+
         # Services
         self.ready_srv = self.create_service(Empty, 'ready', self.ready_callback, callback_group=MutuallyExclusiveCallbackGroup())
         self.home_srv = self.create_service(Empty, 'home_robot', self.home_callback, callback_group=MutuallyExclusiveCallbackGroup())
         self.putt_srv = self.create_service(Empty, 'putt', self.putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
 
         # Timer for optional tasks
-        # self.timer = self.create_timer(0.1, self.timer_callback)
+        self.timer = self.create_timer(0.1, self.timer_callback)
 
         self.get_logger().info("DemoNode initialized. Use '/simulate' or '/real_putt'.")
 
@@ -74,6 +84,30 @@ class DemoNode(Node):
         await self.MPI.move_arm_joints(joint_values=[0.0, -0.4, 0.0, -1.6, 0.0, 1.57, 0.0])
         return response
     
+    def dynamic_brodcaster(self,transform_base_ee: TransformStamped):
+        T_be = transOps.transform_to_htm(transform_base_ee.transform)
+        T_ep = self.putface_ee_transform
+        T_pb = np.dot(np.linalg.inv(T_ep),np.linalg.inv(T_be))
+        self.get_logger().info(f"=============================T_pb::  {T_pb}================================")
+
+        T = transOps.htm_to_transform(T_pb)
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'fer_link8'
+        t.child_frame_id = 'putt_face'
+        t.transform = T    
+        self.tf_dynamic_broadcaster.sendTransform(t)
+
+    def look_up_fer8_frame(self):
+        """Look up the ee position in the base frame"""
+        self.get_logger().info("Looking up ball position in base frame.")
+        try:
+            self.transform_base_ee = self.tf_buffer.lookup_transform(self.base_frame, 'fer_link8', rclpy.time.Time())
+            self.get_logger().info(f"Transform from 'fer_link8' to {self.base_frame}: {self.transform_base_ee}")
+            # self.dynamic_brodcaster(transform_base_ee)
+        except Exception as e:
+            self.get_logger().error(f"Failed to look up the end-effector transform: {e}")
+
     def look_up_ball_in_base_frame(self):
         """Look up the ball position in the base frame"""
         self.get_logger().info("Looking up ball position in base frame.")
@@ -198,10 +232,8 @@ class DemoNode(Node):
         await self.MPI.move_arm_pose(putt_pose, max_velocity_scaling_factor=0.8, max_acceleration_scaling_factor=0.8)
         return response
     
-        
-    # def offset_ball_position(self, z):
-    #     """Offset the ball position by z"""
-    #     self.ball_position[2] += z
+    def timer_callback(self):
+        self.dynamic_brodcaster(self.transform_base_ee)
 
 def main(args=None):
     rclpy.init(args=args)
