@@ -57,9 +57,9 @@ class DemoNode(Node):
             end_effector_frame='fer_link8'
         )
 
-        self.hole_position = None
-        self.ball_position = None
-        self.v_h2b = None
+        # Default fallback positions if TF not available yet
+        self.hole_position = np.array([0.72347078, 0.29201838, 0.05362293])
+        self.ball_position = np.array([0.60659744, -0.04259332, 0.05297366])
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -88,14 +88,17 @@ class DemoNode(Node):
         self.marker_timer = self.create_timer(1.0, self.publish_markers)
 
         # Services
-        self.ready_srv = self.create_service(Empty, 'ready', self.ready_callback, callback_group=MutuallyExclusiveCallbackGroup())
-        self.home_srv = self.create_service(Empty, 'home_robot', self.home_callback, callback_group=MutuallyExclusiveCallbackGroup())
-        self.putt_srv = self.create_service(Empty, 'putt', self.putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.ready_srv = self.create_service(
+            Empty, 'ready', self.ready_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.home_srv = self.create_service(
+            Empty, 'home_robot', self.home_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.putt_srv = self.create_service(
+            Empty, 'putt', self.putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
 
         # Timer for optional tasks
         self.timer = self.create_timer(0.1, self.timer_callback)
 
-        self.get_logger().info("DemoNode initialized. Use '/simulate' or '/real_putt'.")
+        self.get_logger().info("DemoNode initialized. Use '/ready' to set up the putter and '/putt' to execute the putt.")
 
     async def home_callback(self, request, response):
         """Make the robot go to home pose"""
@@ -152,7 +155,7 @@ class DemoNode(Node):
         self.look_up_ball_in_base_frame()
         self.look_up_hole_in_base_frame()
 
-        # Update ball and hole markers
+        # Update ball and hole markers with the latest positions
         self.ball_marker.pose.position.x = float(self.ball_position[0])
         self.ball_marker.pose.position.y = float(self.ball_position[1])
         self.ball_marker.pose.position.z = float(self.ball_position[2])
@@ -175,6 +178,10 @@ class DemoNode(Node):
         self.ball_marker.color.b = 1.0
         self.ball_marker.color.a = 1.0
         self.ball_marker.pose.orientation.w = 1.0
+        # Use fallback positions initially
+        self.ball_marker.pose.position.x = float(self.ball_position[0])
+        self.ball_marker.pose.position.y = float(self.ball_position[1])
+        self.ball_marker.pose.position.z = float(self.ball_position[2])
 
     def setup_hole_marker(self):
         self.hole_marker.ns = "hole_marker_ns"
@@ -190,6 +197,10 @@ class DemoNode(Node):
         self.hole_marker.color.b = 0.0
         self.hole_marker.color.a = 1.0
         self.hole_marker.pose.orientation.w = 1.0
+        # Use fallback positions initially
+        self.hole_marker.pose.position.x = float(self.hole_position[0])
+        self.hole_marker.pose.position.y = float(self.hole_position[1])
+        self.hole_marker.pose.position.z = float(self.hole_position[2])
 
     def setup_vector_marker(self):
         # We'll use an ARROW marker
@@ -198,7 +209,6 @@ class DemoNode(Node):
         self.vector_marker.header.frame_id = self.base_frame
         self.vector_marker.type = Marker.ARROW
         self.vector_marker.action = Marker.ADD
-        # Define arrow thickness
         self.vector_marker.scale.x = 0.01  # shaft diameter
         self.vector_marker.scale.y = 0.02  # head diameter
         self.vector_marker.scale.z = 0.0
@@ -207,10 +217,7 @@ class DemoNode(Node):
         self.vector_marker.color.g = 1.0
         self.vector_marker.color.b = 0.0
         self.vector_marker.color.a = 1.0
-
-        # We'll update the start and end points every time we publish
-        # ARROW marker with two points: start at putt_face, end at hole
-        # We'll do that in publish_markers()
+        # Points will be updated in publish_markers()
 
     def publish_markers(self):
         now = self.get_clock().now().to_msg()
@@ -228,11 +235,10 @@ class DemoNode(Node):
                 putt_face_tf.transform.translation.z
             ])
         except Exception:
-            # If not available, fallback to fer_link8 or just skip
-            self.get_logger().warn("Could not look up putt_face transform, skipping vector marker update.")
-            putt_face_pos = self.ball_position  # fallback
+            # If not available, fallback to ball position
+            self.get_logger().warn("Could not look up putt_face transform, using ball position for vector start.")
+            putt_face_pos = self.ball_position
 
-        # ARROW marker requires marker.points array with two points
         start_point = Point(x=float(putt_face_pos[0]),
                             y=float(putt_face_pos[1]),
                             z=float(putt_face_pos[2]))
@@ -242,7 +248,6 @@ class DemoNode(Node):
 
         self.vector_marker.points = [start_point, end_point]
 
-        # Publish markers
         self.ball_marker_pub.publish(self.ball_marker)
         self.hole_marker_pub.publish(self.hole_marker)
         self.vector_marker_pub.publish(self.vector_marker)
@@ -337,8 +342,7 @@ class DemoNode(Node):
         return response
 
     def timer_callback(self):
-        # If we wanted dynamic broadcasting or other timed tasks, do here
-        pass
+        self.dynamic_brodcaster(self.transform_base_ee)
 
 def main(args=None):
     rclpy.init(args=args)
