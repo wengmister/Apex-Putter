@@ -31,10 +31,10 @@ class DemoNode(Node):
         self.declare_parameter('simulation_mode', True)
         self.use_simulation_mode = self.get_parameter('simulation_mode').get_parameter_value().bool_value
 
-        # Declare parameters for frames used in real world mode
+        # Declare parameters for april tags used in real world mode
         self.declare_parameter('ball_tag_frame', 'ball')
-        self.declare_parameter('hole_tag_frame', 'hole')
-        self.declare_parameter('robot_base_tag_frame', 'robot_base_tag')
+        self.declare_parameter('hole_tag_frame', '36')
+        self.declare_parameter('robot_base_tag_frame', 'robot_base_frame')
         self.declare_parameter('base_frame', 'base')
         self.declare_parameter('camera_frame', 'camera_link')
 
@@ -44,7 +44,7 @@ class DemoNode(Node):
         self.base_frame = self.get_parameter('base_frame').get_parameter_value().string_value
         self.camera_frame = self.get_parameter('camera_frame').get_parameter_value().string_value
 
-        # Known offsets:
+        # Known offsets (Franka uses meters):
         self.putter_length = 22.85 * 0.0254  # ~0.58 m
         self.putter_offset = 0.18 * 0.0254   # ~0.00457 m
 
@@ -100,6 +100,50 @@ class DemoNode(Node):
         self.timer = self.create_timer(0.1, self.timer_callback)
 
         self.get_logger().info("DemoNode initialized. Use '/simulate' or '/real_putt' for sequences.")
+
+    def quaternion_to_rotation_matrix(q: Quaternion):
+        # Extract components of the quaternion
+        x = q.x
+        y = q.y
+        z = q.z
+        w = q.w
+
+        R = np.array([
+            [1 - 2*(y**2 + z**2), 2*(x*y - z*w), 2*(x*z + y*w)],
+            [2*(x*y + z*w), 1 - 2*(x**2 + z**2), 2*(y*z - x*w)],
+            [2*(x*z - y*w), 2*(y*z + x*w), 1 - 2*(x**2 + y**2)]
+        ])
+
+        return R
+
+
+    def rotation_matrix_to_quaternion(R):
+        # Compute the trace of the matrix
+        T = np.trace(R)
+
+        if T > 0:
+            w = np.sqrt(T + 1) / 2
+            x = (R[2, 1] - R[1, 2]) / (4 * w)
+            y = (R[0, 2] - R[2, 0]) / (4 * w)
+            z = (R[1, 0] - R[0, 1]) / (4 * w)
+        else:
+            if R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+                x = np.sqrt(1 + R[0, 0] - R[1, 1] - R[2, 2]) / 2
+                w = (R[2, 1] - R[1, 2]) / (4 * x)
+                y = (R[0, 1] + R[1, 0]) / (4 * x)
+                z = (R[0, 2] + R[2, 0]) / (4 * x)
+            elif R[1, 1] > R[2, 2]:
+                y = np.sqrt(1 + R[1, 1] - R[0, 0] - R[2, 2]) / 2
+                w = (R[0, 2] - R[2, 0]) / (4 * y)
+                x = (R[0, 1] + R[1, 0]) / (4 * y)
+                z = (R[1, 2] + R[2, 1]) / (4 * y)
+            else:
+                z = np.sqrt(1 + R[2, 2] - R[0, 0] - R[1, 1]) / 2
+                w = (R[1, 0] - R[0, 1]) / (4 * z)
+                x = (R[0, 2] + R[2, 0]) / (4 * z)
+                y = (R[1, 2] + R[2, 1]) / (4 * z)
+
+        return Quaternion(x=x, y=y, z=z, w=w)
 
     def update_real_world_positions(self):
         """
@@ -177,6 +221,7 @@ class DemoNode(Node):
         wp2 = make_pose(at_ball_pos[0], at_ball_pos[1], z_height)
         wp3 = make_pose(beyond_hole_pos[0], beyond_hole_pos[1], z_height)
 
+        # currently commented out for our new and improved URDF
         if self.use_simulation_mode:
             # Simulation mode (previously we applied putter offsets in base)
             # Commenting out offset lines since URDF now places fer_link8 at putter head:
@@ -334,9 +379,7 @@ class DemoNode(Node):
         hole_pose.position.z = float(self.hole_position[2])
         hole_pose.orientation.w = 1.0
 
-        # Align the club face asynchronously (assuming MPI has this method)
-        # Make sure you've implemented align_club_face in MPI
-        await self.MPI.align_club_face(ball_pose, hole_pose)
+        await self.align_club_face(ball_pose, hole_pose)
 
         self.get_logger().info("Attempting full real-world motion sequence...")
         success = await self.run_motion_sequence()
