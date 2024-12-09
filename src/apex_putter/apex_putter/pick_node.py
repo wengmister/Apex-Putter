@@ -68,6 +68,44 @@ def rotation_matrix_to_quaternion(R):
     return Quaternion(x=x, y=y, z=z, w=w)
 
 
+def quaternion_from_euler(ai, aj, ak):
+    """
+    Convert from euler angles of to a quaternion.
+
+    Args:
+    ----
+    ai: roll
+    aj: pitch
+    ak: yaw
+
+    Return:
+    ------
+    A Quaternion corresponding to the rotation
+
+    """
+    ai /= 2.0
+    aj /= 2.0
+    ak /= 2.0
+    ci = np.cos(ai)
+    si = np.sin(ai)
+    cj = np.cos(aj)
+    sj = np.sin(aj)
+    ck = np.cos(ak)
+    sk = np.sin(ak)
+    cc = ci*ck
+    cs = ci*sk
+    sc = si*ck
+    ss = si*sk
+
+    q = np.empty((4, ))
+    q[0] = cj*sc - sj*cs
+    q[1] = cj*ss + sj*cc
+    q[2] = cj*cs - sj*sc
+    q[3] = cj*cc + sj*ss
+
+    return q
+
+
 class State(Enum):
     """Current state of the pick_node node."""
 
@@ -153,9 +191,9 @@ class PickNode(Node):
         t.header.frame_id = 'fer_link8'
         t.child_frame_id = 'club_face'
 
-        t.transform.translation.x = float(0.013274)
-        t.transform.translation.y = float(0.047312)
-        t.transform.translation.z = float(0.58929)
+        t.transform.translation.x = float(0.02)
+        t.transform.translation.y = float(0.0)
+        t.transform.translation.z = float(0.52)
         t.transform.rotation.x = 0.0  # 0.659466
         t.transform.rotation.y = 0.0  # -0.215248
         t.transform.rotation.z = 0.0  # 0.719827
@@ -189,43 +227,114 @@ class PickNode(Node):
         # transform_operations.detected obj pose -> goal pose.
         # await self.MPI.move_arm_pose(goal_pose=self.pose)
         # await self.MPI.move_arm_cartesian(waypoints=self.waypoints)
-        pose = Pose()
-        pose.position.x = 0.3
-        pose.position.y = 0.0
-        pose.position.z = 0.01
-        await self.align_club_face(pose)
+        ball_pose = Pose()
+        ball_pose.position.x = 0.3
+        ball_pose.position.y = 0.0
+        ball_pose.position.z = 0.021
+        hole_pose = Pose()
+        hole_pose.position.x = 0.2
+        hole_pose.position.y = 0.4
+        hole_pose.position.z = 0.015
+        await self.goal_club_tf(ball_pose, hole_pose)
 
-    async def align_club_face(self, ball_pose: Pose, hole_pose: Pose = None):
-        club_face_pose = await self.MPI.get_transform('base', 'club_face')
+    async def goal_club_tf(self, ball_pose: Pose, hole_pose: Pose = None):
+        radius = 0.045
+        ball_pos = ball_pose.position
+        hole_pos = hole_pose.position
+        ball_hole_vec = np.array(
+            [hole_pos.x - ball_pos.x, hole_pos.y - ball_pos.y])
+        theta_hole_ball = np.arctan2(ball_hole_vec[1], ball_hole_vec[0])
+        ball_hole_mag = np.linalg.norm(ball_hole_vec)
+        ball_hole_unit = ball_hole_vec / ball_hole_mag
+        club_face_position = -radius * ball_hole_unit
+        club_face_orientation = quaternion_from_euler(
+            0.0, 0.0, theta_hole_ball)
+        t = TransformStamped()
+
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'ball'
+        t.child_frame_id = 'goal_face'
+
+        t.transform.translation.x = float(club_face_position[0])
+        t.transform.translation.y = float(club_face_position[1])
+        t.transform.translation.z = float(0.0)
+        t.transform.rotation.x = club_face_orientation[0]
+        t.transform.rotation.y = club_face_orientation[1]
+        t.transform.rotation.z = club_face_orientation[2]
+        t.transform.rotation.w = club_face_orientation[3]
+
+        self.tf_static_broadcaster.sendTransform(t)
 
     async def timer_callback(self):
         """Timer callback."""
         if self.state == State.START:
-            # self.scene_parameters = [
-            #     {
-            #         'id': 'object',
-            #         'size': (0.03, 0.03, 0.03),
-            #         'position': (0.35, 0.099, 0.015),
-            #         'orientation': (0.0, 0.0, 0.0, 1.0),
-            #         'frame_id': 'base'
-            #     },
-            #     {
-            #         'id': 'table',
-            #         'size': (0.5, 1.0, 0.01),
-            #         'position': (0.35, 0.0, -0.005),
-            #         'frame_id': 'base'
-            #     },
-            #     {
-            #         'id': 'obstacle',
-            #         'size': (0.3, 0.05, 0.2),
-            #         'position': (0.25, -0.1, 0.1),
-            #         'orientation': (0.0, 0.0, 0.0, 1.0),
-            #         'frame_id': 'base'
-            #     }
-            # ]
-            # self.scene_set = False
-            # self.scene_future = await self.MPI.load_scene_from_parameters(
-            #     self.scene_parameters)
+            self.scene_parameters = [
+                {
+                    'id': 'hole',
+                    'size': (0.03, 0.03, 0.03),
+                    'position': (0.2, 0.4, 0.015),
+                    'orientation': (0.0, 0.0, 0.0, 1.0),
+                    'frame_id': 'base'
+                },
+                {
+                    'id': 'table',
+                    'size': (0.5, 1.0, 0.01),
+                    'position': (0.35, 0.0, -0.005),
+                    'frame_id': 'base'
+                },
+                {
+                    'id': 'ball',
+                    'size': (0.042, 0.042, 0.042),
+                    'position': (0.3, 0.0, 0.021),
+                    'orientation': (0.0, 0.0, 0.0, 1.0),
+                    'frame_id': 'base'
+                }
+            ]
+            t = TransformStamped()
+
+            t.header.stamp = self.get_clock().now().to_msg()
+            t.header.frame_id = 'base'
+            t.child_frame_id = 'hole'
+
+            t.transform.translation.x = float(0.2)
+            t.transform.translation.y = float(0.4)
+            t.transform.translation.z = float(0.015)
+            t.transform.rotation.x = 0.0  # 0.659466
+            t.transform.rotation.y = 0.0  # -0.215248
+            t.transform.rotation.z = 0.0  # 0.719827
+            t.transform.rotation.w = 1.0  # 0.0249158
+
+            self.tf_static_broadcaster.sendTransform(t)
+
+            t = TransformStamped()
+
+            t.header.stamp = self.get_clock().now().to_msg()
+            t.header.frame_id = 'base'
+            t.child_frame_id = 'ball'
+
+            t.transform.translation.x = float(0.3)
+            t.transform.translation.y = float(0.0)
+            t.transform.translation.z = float(0.021)
+            t.transform.rotation.x = 0.0  # 0.659466
+            t.transform.rotation.y = 0.0  # -0.215248
+            t.transform.rotation.z = 0.0  # 0.719827
+            t.transform.rotation.w = 1.0  # 0.0249158
+
+            self.tf_static_broadcaster.sendTransform(t)
+
+            self.scene_set = False
+            self.scene_future = await self.MPI.load_scene_from_parameters(
+                self.scene_parameters)
+
+            ball_pose = Pose()
+            ball_pose.position.x = 0.3
+            ball_pose.position.y = 0.0
+            ball_pose.position.z = 0.021
+            hole_pose = Pose()
+            hole_pose.position.x = 0.2
+            hole_pose.position.y = 0.4
+            hole_pose.position.z = 0.015
+            await self.align_club_face(ball_pose, hole_pose)
             self.state = State.IDLE
         elif self.state == State.IDLE:
             pass
