@@ -167,3 +167,5 @@ log/
 install/
 
 src/franka
+
+venv_ros

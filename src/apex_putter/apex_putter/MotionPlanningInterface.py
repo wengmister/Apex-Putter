@@ -220,6 +220,12 @@ class MotionPlanningInterface():
             execute
         )
 
+    async def get_current_end_effector_pose(self):
+        return await self.RobotState.get_current_end_effector_pose()
+
+    async def get_transform(self, base_frame, end_frame):
+        return await self.RobotState.get_transform(base_frame, end_frame)
+
     # PlanningScene functions
     async def add_box(self, box_id, size, position, orientation=(0.0, 0.0, 0.0, 1.0), frame_id='base'):
         return await self.PlanningScene.add_box_async(
