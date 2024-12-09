@@ -39,10 +39,9 @@ class DemoNode(Node):
         self.puttface_dim = [0.1,0.02,0.028]
         self.goal_ball_radius = 2.03
         # testing vals.
-        self.putface_ee_transform =  np.array([
-                                                [0.7071, -0.7071, 0, 1],
-                                                [0.7071, 0.7071, 0, 0.44454056],
-                                                [0, 0, 1, 0.66401457],
+        self.putface_ee_transform =  np.array([ [1, 0, 0, 0],
+                                                [0, 1, 0, 0],
+                                                [0, 0, 1, 0.53],
                                                 [0, 0, 0, 1]])
 
         # Motion planning interface
@@ -178,13 +177,24 @@ class DemoNode(Node):
         """Putt the ball"""
         self.get_logger().info("Putt requested.")
         self.get_logger().info("=============================================================")
+        
+        # Swinging till a distance of 0.2, towards the ball.
+        putt_pose_wrt_pf = np.zeros(3)
+        putt_pose_wrt_pf[0] = self.ball_position[0] - 0.2 * self.v_h2b[0]
+        putt_pose_wrt_pf[1] = self.ball_position[1] - 0.2 * self.v_h2b[1]
+        putt_pose_wrt_pf[2] = self.ball_position[2]
+
+        # Puttface to ee transform.
+        pose_homogeneous = np.append(putt_pose_wrt_pf, 1).reshape(1, 4)
+        putt_pose_wrt_ee = np.dot(pose_homogeneous, self.putface_ee_transform)
 
         putt_pose = Pose()
-        putt_pose.position.x = self.ball_position[0] - 0.2 * self.v_h2b[0]
-        putt_pose.position.y = self.ball_position[1] - 0.2 * self.v_h2b[1]
-        putt_pose.position.z = self.ball_position[2]
-        # make oritentation vertical downwards
-        putt_pose.orientation = Quaternion(x=0.92, y=-0.38, z=0.00035, w=0.0004)
+        putt_pose.position.x = putt_pose_wrt_ee[0,0]
+        putt_pose.position.y = putt_pose_wrt_ee[0,1]
+        putt_pose.position.z = putt_pose_wrt_ee[0,2]
+
+        orientation = self.calculate_putting_orientation(self.v_b2p)
+        putt_pose.orientation = orientation
         await self.MPI.move_arm_pose(putt_pose, max_velocity_scaling_factor=0.8, max_acceleration_scaling_factor=0.8)
         return response
     
