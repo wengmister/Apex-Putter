@@ -134,7 +134,7 @@ def deproject_ball_pose(dx,dy,dz, R=2.1):
     distance = math.sqrt(dx**2 + dy**2 + dz**2)
     
     # Scale the displacement to account for the radius of the ball.
-    scaling_factor = distance / (distance + R)
+    scaling_factor = (distance + R) / distance
     
     # Coordinates of the ball center
     x_r = dx * scaling_factor
