@@ -263,14 +263,14 @@ class DemoNode(Node):
     
     async def align_club_face(self, ball_pose: Pose, hole_pose: Pose = None):
         # Retrieve current club_face pose from 'base'
-        club_face_pose_stamped = await self.MPI.get_transform('base', 'fer_lin8')
+        club_face_pose_stamped = await self.MPI.get_transform('base', 'fer_link8')  # Ensure this frame name is correct
         club_face_pose = club_face_pose_stamped.pose
 
         # Compute direction from ball to hole if hole_pose is given
         if hole_pose is not None:
             direction = np.array([hole_pose.position.x - ball_pose.position.x,
-                                  hole_pose.position.y - ball_pose.position.y,
-                                  0.0])
+                                    hole_pose.position.y - ball_pose.position.y,
+                                    0.0])
         else:
             direction = np.array([1.0, 0.0, 0.0])  # Default direction
 
@@ -281,10 +281,10 @@ class DemoNode(Node):
             self.get_logger().warn("Ball and hole are at the same point or hole not provided, skipping club face alignment.")
             return
 
-        # Set yaw so the X-axis points along direction, but we may need this to change depending on which axis we want to do
+        # Set yaw so the X-axis points along direction
         yaw = math.atan2(direction[1], direction[0])
         pitch = 0.0
-        roll = math.pi  # if needed to flip the orientation
+        roll = math.pi  # flip orientation if needed
 
         qx, qy, qz, qw = quaternion_from_euler(roll, pitch, yaw)
 
@@ -297,8 +297,12 @@ class DemoNode(Node):
 
         self.get_logger().info(f"Aligning club face. Desired orientation: {qx}, {qy}, {qz}, {qw}")
 
-        # Would we want to get this now and then align?
-        # await self.MPI.move_arm_pose(goal_pose=desired_pose)
+        # Move the robot end-effector to the desired orientation
+        result = await self.MPI.move_arm_pose(goal_pose=desired_pose)
+        if result:
+            self.get_logger().info("Club face alignment succeeded.")
+        else:
+            self.get_logger().error("Club face alignment failed.")
 
     def setup_ball_marker(self):
         self.ball_marker.ns = "ball_marker_ns"
