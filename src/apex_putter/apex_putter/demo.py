@@ -9,6 +9,7 @@ import tf2_ros
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros import TransformBroadcaster
+from transforms3d.quaternions import axangle2quat, qmult
 import time
 
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
@@ -172,12 +173,18 @@ class DemoNode(Node):
         opposite_vector = -unit_vector
         putting_angle = -norm_ang
 
+        # Axis-angle to quaternion
+        # axis = [0, 0, 1]  # Rotation about the Z-axis
+        # angle = 1.57  # Rotation angle in radians
+        quat = axangle2quat(opposite_vector, putting_angle)  # [w, x, y, z]
+        print("Quaternion:", quat)
         # Calculate quaternion components : need confirm the formula.
-        w = np.cos(putting_angle / 2)
-        x = unit_vector[0] * np.sin(putting_angle / 2)
-        y = unit_vector[1] * np.sin(putting_angle / 2)
-        z = unit_vector[2] * np.sin(putting_angle / 2)
-        orientation = Quaternion(x=x, y=y, z=z, w=w)
+        # orientation = quat 
+        orientation = Quaternion(
+        x=quat[1],
+        y=quat[2],
+        z=quat[3],
+        w=quat[0]    )       
         return orientation
     
     async def ready_callback(self, request, response):
@@ -192,7 +199,7 @@ class DemoNode(Node):
         pose_wrt_putface[1] = self.ball_position[1] + self.v_b2p[1] 
         pose_wrt_putface[2]= self.ball_position[2] + self.v_b2p[2] + 0.53  #translated to make it wrt ee
 
-        # Puttface to ee transform
+        # Puttface to ee transform.
         pose_wrt_putface_homogeneous = np.append(pose_wrt_putface, 1).reshape(1, 4)
         self.get_logger().info(f"\n ========================== self.putface_ee_transform { self.putface_ee_transform}===================================")
 
