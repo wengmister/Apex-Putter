@@ -119,7 +119,7 @@ def detected_obj_pose(T_camObj: Transform):
     # pose.orientation.w = -5.0747e-06
     return pose
 
-def deproject_ball_pose(x_c,y_c,z_c, x_b, y_b, z_b, R=2.1):
+def deproject_ball_pose(dx,dy,dz, R=2.1):
     '''
     Input:
         (x_c, y_c, z_c) : camera pose
@@ -129,21 +129,17 @@ def deproject_ball_pose(x_c,y_c,z_c, x_b, y_b, z_b, R=2.1):
         (x_r, y_r, z_r) : pose for center of the ball.
     '''
     # R: Radius of ball
-
-    dx = x_b - x_c
-    dy = y_b - y_c
-    dz = z_b - z_c
     
     # Distance from the camera to the ball.
     distance = math.sqrt(dx**2 + dy**2 + dz**2)
     
     # Scale the displacement to account for the radius of the ball.
-    scaling_factor = distance / (distance - R)
+    scaling_factor = distance / (distance + R)
     
     # Coordinates of the ball center
-    x_r = x_b + dx * scaling_factor
-    y_r = y_b + dy * scaling_factor
-    z_r = z_b + dz * scaling_factor
+    x_r = dx * scaling_factor
+    y_r = dy * scaling_factor
+    z_r = dz * scaling_factor
     
     return x_r, y_r, z_r
 
