@@ -102,14 +102,14 @@ class DemoNode(Node):
 
         self.v_h2b = self.calculate_hole_to_ball_vector()
 
-        self.offset_ball_position(0.60)
+        self.offset_ball_position(0.56)
         ball_pose = Pose()
         ball_pose.position.x = self.ball_position[0] + 0.1 * self.v_h2b[0]
         ball_pose.position.y = self.ball_position[1] + 0.1 * self.v_h2b[1]
         ball_pose.position.z = self.ball_position[2]
         # make oritentation vertical downwards
         ball_pose.orientation = Quaternion(x=0.92, y=-0.38, z=0.00035, w=0.0004)
-        await self.MPI.move_arm_pose(ball_pose, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.5)
+        await self.MPI.move_arm_pose(ball_pose, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
         return response
     
     async def putt_callback(self, request, response):
