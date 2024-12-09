@@ -115,7 +115,7 @@ class DemoNode(Node):
 
             # Lookup ball position in base frame
             ball_tf = self.tf_buffer.lookup_transform(self.base_frame, self.ball_tag_frame, rclpy.time.Time())
-            ball_offset = np.array([0.0, 0.0, 0.0])  # Adjust if needed
+            ball_offset = np.array([0.0, 0.0, 0.0])  # TODO: Adjust these for the offset from the robot in the x, y, or z frames.
             self.ball_position = np.array([
                 ball_tf.transform.translation.x,
                 ball_tf.transform.translation.y,
@@ -196,7 +196,7 @@ class DemoNode(Node):
 
 
     def default_waypoints(self):
-        # don't worry these change!
+        # don't worry these change! It's just a default hard coded value
         w1 = Pose()
         w1.position.x = 0.45
         w1.position.y = 0.0
@@ -215,6 +215,45 @@ class DemoNode(Node):
         w3.position.z = 0.4
         w3.orientation.w = 1.0
         return [w1, w2, w3]
+    
+    async def align_club_face(self, ball_pose: Pose, hole_pose: Pose = None):
+        # Retrieve current club_face pose from 'base'
+        club_face_pose_stamped = await self.MPI.get_transform('base', 'fer_lin8')
+        club_face_pose = club_face_pose_stamped.pose
+
+        # Compute direction from ball to hole if hole_pose is given
+        if hole_pose is not None:
+            direction = np.array([hole_pose.position.x - ball_pose.position.x,
+                                  hole_pose.position.y - ball_pose.position.y,
+                                  0.0])
+        else:
+            direction = np.array([1.0, 0.0, 0.0])  # Default direction
+
+        dist = np.linalg.norm(direction)
+        if dist > 1e-6:
+            direction /= dist
+        else:
+            self.get_logger().warn("Ball and hole are at the same point or hole not provided, skipping club face alignment.")
+            return
+
+        # Set yaw so the X-axis points along direction, but we may need this to change depending on which axis we want to do
+        yaw = math.atan2(direction[1], direction[0])
+        pitch = 0.0
+        roll = math.pi  # if needed to flip the orientation
+
+        qx, qy, qz, qw = quaternion_from_euler(roll, pitch, yaw)
+
+        desired_pose = Pose()
+        desired_pose.position = club_face_pose.position
+        desired_pose.orientation.x = qx
+        desired_pose.orientation.y = qy
+        desired_pose.orientation.z = qz
+        desired_pose.orientation.w = qw
+
+        self.get_logger().info(f"Aligning club face. Desired orientation: {qx}, {qy}, {qz}, {qw}")
+
+        # Would we want to get this now and then align?
+        # await self.MPI.move_arm_pose(goal_pose=desired_pose)
 
     def setup_ball_marker(self):
         self.ball_marker.ns = "ball_marker_ns"
