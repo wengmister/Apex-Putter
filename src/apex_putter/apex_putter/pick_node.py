@@ -9,7 +9,7 @@ SERVICES:
 
 from enum import auto, Enum
 
-from geometry_msgs.msg import Pose, Quaternion
+from geometry_msgs.msg import Pose, Quaternion, TransformStamped
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 import numpy as np
 import rclpy
@@ -18,6 +18,9 @@ from rclpy.node import Node
 from std_srvs.srv import Empty
 import modern_robotics as mr
 import apex_putter.transform_operations as to
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 
 
 def quaternion_to_rotation_matrix(q: Quaternion):
@@ -140,6 +143,26 @@ class PickNode(Node):
         self.curr_man = 0
         self.curr_hand = 0
 
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.tf_static_broadcaster = StaticTransformBroadcaster(self)
+
+        t = TransformStamped()
+
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'fer_link8'
+        t.child_frame_id = 'club_face'
+
+        t.transform.translation.x = float(0.013274)
+        t.transform.translation.y = float(0.047312)
+        t.transform.translation.z = float(0.58929)
+        t.transform.rotation.x = 0.0  # 0.659466
+        t.transform.rotation.y = 0.0  # -0.215248
+        t.transform.rotation.z = 0.0  # 0.719827
+        t.transform.rotation.w = 1.0  # 0.0249158
+
+        self.tf_static_broadcaster.sendTransform(t)
+
         # Create service
         self.pick = self.create_service(Empty, 'pick', self.pick_callback,
                                         callback_group=MutuallyExclusiveCallbackGroup())
@@ -173,41 +196,7 @@ class PickNode(Node):
         await self.align_club_face(pose)
 
     async def align_club_face(self, ball_pose: Pose, hole_pose: Pose = None):
-        ball_radius = 0.0213
-        ball_position = ball_pose.position
-        ball_orientation = ball_pose.orientation
-
-        club_face = Pose()
-        club_face.position.x = 0.013274
-        club_face.position.y = 0.047312
-        club_face.position.z = 0.58929
-        club_face.orientation.x = 0.659466
-        club_face.orientation.y = -0.215248
-        club_face.orientation.z = 0.719827
-        club_face.orientation.w = 0.0249158
-
-        R_ee_club = quaternion_to_rotation_matrix(club_face.orientation)
-        p_club = [club_face.position.x,
-                  club_face.position.y, club_face.position.z]
-
-        R_ball = quaternion_to_rotation_matrix(ball_orientation)
-        p_ball = [ball_position.x, ball_position.y, ball_position.z]
-
-        T_base_ball = mr.RpToTrans(R_ball, p_ball)
-        T_ee_club = mr.RpToTrans(R_ee_club, p_club)
-
-        T_base_ee = T_base_ball @ mr.TransInv(T_ee_club)
-
-        R_base_ee, p_ee = mr.TransToRp(T_base_ee)
-
-        ee_pose = Pose()
-        ee_pose.position.x = p_ee[0]
-        ee_pose.position.y = p_ee[1]
-        ee_pose.position.z = p_ee[2]
-
-        ee_pose.orientation = rotation_matrix_to_quaternion(R_base_ee)
-
-        await self.MPI.move_arm_pose(ee_pose)
+        club_face_pose = await self.MPI.get_transform('base', 'club_face')
 
     async def timer_callback(self):
         """Timer callback."""
