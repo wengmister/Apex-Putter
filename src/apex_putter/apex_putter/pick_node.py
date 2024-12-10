@@ -11,6 +11,7 @@ from enum import auto, Enum
 
 from geometry_msgs.msg import Pose, Quaternion, TransformStamped
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
+import apex_putter.transform_operations as transOps
 import numpy as np
 import rclpy
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
@@ -254,15 +255,47 @@ class PickNode(Node):
         # transform_operations.detected obj pose -> goal pose.
         # await self.MPI.move_arm_pose(goal_pose=self.pose)
         # await self.MPI.move_arm_cartesian(waypoints=self.waypoints)
-        ball_pose = Pose()
-        ball_pose.position.x = 0.3
-        ball_pose.position.y = 0.0
-        ball_pose.position.z = 0.021
-        hole_pose = Pose()
-        hole_pose.position.x = 0.2
-        hole_pose.position.y = 0.4
-        hole_pose.position.z = 0.015
-        await self.goal_club_tf(ball_pose, hole_pose)
+        club_face_tf = await self.MPI.get_transform('base', 'club_face')
+        hole_tf = await self.MPI.get_transform('base', 'hole')
+        ee_tf = await self.MPI.get_transform('base', 'fer_link8')
+        ee_pose = ee_tf.pose
+        hole_pose = hole_tf.pose
+
+        club_face_pos = club_face_tf.pose.position
+        hole_pos = hole_pose.position
+
+        traj_vec = np.array([hole_pos.x - club_face_pos.x,
+                             hole_pos.y - club_face_pos.y])
+        traj_mag = np.linalg.norm(traj_vec)
+        traj_norm = traj_vec / traj_mag
+
+        waypoints = []
+        for i in range(5):
+            pose = Pose()
+            pose.position.x = ee_pose.position.x - i*0.05*traj_norm[0]
+            pose.position.y = ee_pose.position.y - i*0.05*traj_norm[1]
+            pose.position.z = ee_pose.position.z
+            pose.orientation = ee_pose.orientation
+            waypoints.append(pose)
+
+        for i in range(4, -1):
+            pose = Pose()
+            pose.position.x = ee_pose.position.x - i*0.05*traj_norm[0]
+            pose.position.y = ee_pose.position.y - i*0.05*traj_norm[1]
+            pose.position.z = ee_pose.position.z
+            pose.orientation = ee_pose.orientation
+            waypoints.append(pose)
+
+        for i in range(5):
+            pose = Pose()
+            pose.position.x = ee_pose.position.x + i*0.05*traj_norm[0]
+            pose.position.y = ee_pose.position.y + i*0.05*traj_norm[1]
+            pose.position.z = ee_pose.position.z
+            pose.orientation = ee_pose.orientation
+            waypoints.append(pose)
+
+        await self.MPI.move_arm_cartesian(waypoints)
+        return response
 
     async def goal_club_tf(self, ball_pose: Pose, hole_pose: Pose = None):
         radius = 0.045
@@ -276,15 +309,18 @@ class PickNode(Node):
         club_face_position = -radius * ball_hole_unit
         club_face_orientation = quaternion_from_euler(
             0.0, 0.0, theta_hole_ball)
+
         t = TransformStamped()
 
         t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'ball'
+        t.header.frame_id = 'base'
         t.child_frame_id = 'goal_face'
 
-        t.transform.translation.x = float(club_face_position[0])
-        t.transform.translation.y = float(club_face_position[1])
-        t.transform.translation.z = float(0.0)
+        t.transform.translation.x = ball_pos.x + \
+            0.05 * ball_hole_unit[0]
+        t.transform.translation.y = ball_pos.y + \
+            0.05 * ball_hole_unit[1]
+        t.transform.translation.z = ball_pos.z
         t.transform.rotation.x = club_face_orientation[0]
         t.transform.rotation.y = club_face_orientation[1]
         t.transform.rotation.z = club_face_orientation[2]
