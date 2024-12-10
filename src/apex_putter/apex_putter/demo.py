@@ -134,7 +134,7 @@ class DemoNode(Node):
 
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.56
+        t.transform.translation.z = 0.60
 
         dummy_orientation = quaternion_from_euler(np.pi, 0.0, 0.0)
         t.transform.rotation.x = dummy_orientation[0]
