@@ -194,13 +194,13 @@ class DemoNode(Node):
 
         self.get_logger().info("Moving arm to putt.")
 
-        future = await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.15, max_acceleration_scaling_factor=0.15)
+        # await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.15, max_acceleration_scaling_factor=0.15)
 
         # self.get_logger().info("Putt the ball.")
-        sleep(0.8)
-        future_2 = await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.4, max_acceleration_scaling_factor=0.4)
+        # sleep(0.8)
+        # await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.4, max_acceleration_scaling_factor=0.4)
 
-        # await self.MPI.move_arm_cartesian([putt_pose_1, putt_pose_2], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        await self.MPI.move_arm_cartesian([putt_pose_1, putt_pose_2], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
         return response
     
     async def swing_callback(self, request, response):
