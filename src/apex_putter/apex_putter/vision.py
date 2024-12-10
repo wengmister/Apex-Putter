@@ -349,11 +349,35 @@ class Vision(Node):
                 camera_to_ball_transform.transform.translation.z = z
 
                 self.tf_broadcaster.sendTransform(camera_to_ball_transform)
+    
+    def publish_target_transform(self):
+        """Offset the target marker by a distance"""
+        # Look up tag15 transform
+        try:
+            tag15_transform = self.tf_buffer.lookup_transform('camera_color_optical_frame', 'tag_15', rclpy.time.Time())
+            tag15_dx = tag15_transform.transform.translation.x
+            tag15_dy = tag15_transform.transform.translation.y
+            tag15_dz = tag15_transform.transform.translation.z
+
+            comp_dx, comp_dy, comp_dz = transOps.compensate_ball_radius(dx=tag15_dx, dy=tag15_dy, dz=tag15_dz, R=0.03)
+
+            target_transform = TransformStamped()
+            target_transform.header.stamp = self.get_clock().now().to_msg()
+            target_transform.header.frame_id = 'camera_color_optical_frame'
+            target_transform.child_frame_id = 'target'
+            target_transform.transform.translation.x = comp_dx
+            target_transform.transform.translation.y = comp_dy
+            target_transform.transform.translation.z = comp_dz
+            
+            self.tf_broadcaster.sendTransform(target_transform)
+        except:
+            self.get_logger().error("Error looking up tag_15 transform")
 
     def timer_callback(self):
         self.publish_rbf()
         self.drop_ball_marker()
         self.publish_ball_transform()
+        self.publish_target_transform()
 
 def main(args=None):
     rclpy.init(args=args)

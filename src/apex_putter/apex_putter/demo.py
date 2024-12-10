@@ -185,11 +185,11 @@ class DemoNode(Node):
             pose.orientation = ideal_pose.orientation
             return pose
 
-        putt_pose_1 = contruct_putt_pose(traj_unit, ideal_pose, -0.15)
+        # putt_pose_1 = contruct_putt_pose(traj_unit, ideal_pose, -0.15)
 
         putt_pose_2 = contruct_putt_pose(traj_unit, ideal_pose, 0.11)
 
-        self.get_logger().info(f"putt_pose_1.{putt_pose_1}")
+        # self.get_logger().info(f"putt_pose_1.{putt_pose_1}")
         self.get_logger().info(f"putt_pose_2.{putt_pose_2}")
 
         self.get_logger().info("Moving arm to putt.")
@@ -198,9 +198,9 @@ class DemoNode(Node):
 
         # self.get_logger().info("Putt the ball.")
         # sleep(0.8)
-        # await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.4, max_acceleration_scaling_factor=0.4)
+        await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.4)
 
-        await self.MPI.move_arm_cartesian([putt_pose_1, putt_pose_2], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        # await self.MPI.move_arm_cartesian([putt_pose_1, putt_pose_2], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
         return response
     
     async def swing_callback(self, request, response):
@@ -216,7 +216,7 @@ class DemoNode(Node):
         swung_joint_values[4] = swung_joint_values[4] + np.pi/6
 
         # Swing the putter
-        await self.MPI.move_arm_joints(joint_values=swung_joint_values, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        await self.MPI.move_arm_joints(joint_values=swung_joint_values, max_velocity_scaling_factor=0.6, max_acceleration_scaling_factor=0.6)
         return response
     
     def offset_ball_position(self, z):
