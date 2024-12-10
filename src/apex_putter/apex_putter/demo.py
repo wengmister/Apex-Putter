@@ -8,6 +8,7 @@ from geometry_msgs.msg import TransformStamped
 import tf2_ros
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 import apex_putter.transform_operations as transOps
+from time import sleep
 
 from tf_transformations import quaternion_from_euler
 
@@ -55,6 +56,7 @@ class DemoNode(Node):
         self.ready_srv = self.create_service(Empty, 'ready', self.ready_callback, callback_group=MutuallyExclusiveCallbackGroup())
         self.home_srv = self.create_service(Empty, 'home_robot', self.home_callback, callback_group=MutuallyExclusiveCallbackGroup())
         self.putt_srv = self.create_service(Empty, 'putt', self.putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.swing_srv = self.create_service(Empty, 'swing', self.swing_callback, callback_group=MutuallyExclusiveCallbackGroup())
 
         # Timer for optional tasks
         # self.timer = self.create_timer(0.1, self.timer_callback)
@@ -175,10 +177,10 @@ class DemoNode(Node):
         traj_mag = np.linalg.norm(traj_vec)
         traj_unit = traj_vec / traj_mag 
 
-        def contruct_putt_pose(traj_unit, ideal_pose, scaling):
+        def contruct_putt_pose(vector, ideal_pose, scaling):
             pose = Pose()
-            pose.position.x = ideal_pose.position.x - scaling * traj_unit[0]
-            pose.position.y = ideal_pose.position.y - scaling * traj_unit[1]
+            pose.position.x = ideal_pose.position.x - scaling * vector[0]
+            pose.position.y = ideal_pose.position.y - scaling * vector[1]
             pose.position.z = ideal_pose.position.z
             pose.orientation = ideal_pose.orientation
             return pose
@@ -192,13 +194,29 @@ class DemoNode(Node):
 
         self.get_logger().info("Moving arm to putt.")
 
-        # future = await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        future = await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
 
         # self.get_logger().info("Putt the ball.")
-        
-        # future_2 = await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.5)
+        sleep(0.5)
+        future_2 = await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.5)
 
-        await self.MPI.move_arm_cartesian([putt_pose_1, putt_pose_2], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        # await self.MPI.move_arm_cartesian([putt_pose_1, putt_pose_2], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        return response
+    
+    async def swing_callback(self, request, response):
+        """Swing 'em!!"""
+        self.get_logger().info("Swing requested.")
+        self.get_logger().info("=============================================================")
+
+        # Look up the current joint configuration
+        current_robot_state = self.MPI.RobotState.get_robot_state()
+        current_joint_values = current_robot_state.joint_state.position
+
+        swung_joint_values = current_joint_values
+        swung_joint_values[4] = swung_joint_values[4] + np.pi/6
+
+        # Swing the putter
+        await self.MPI.move_arm_joints(joint_values=swung_joint_values, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
         return response
     
     def offset_ball_position(self, z):
