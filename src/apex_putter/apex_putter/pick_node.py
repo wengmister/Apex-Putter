@@ -106,6 +106,33 @@ def quaternion_from_euler(ai, aj, ak):
     return q
 
 
+def quaternion_difference(q1: Quaternion, q2: Quaternion):
+    q1 = np.array([q1.x, q1.y, q1.z, q1.w])
+    q2 = np.array([q2.x, q2.y, q2.z, q2.w])
+
+    q_star = np.array([-q2[0], -q2[1], -q2[2], q2[3]])
+    q2_mag = np.linalg.norm(q2)
+    q2_inv = q_star / q2_mag
+
+    w = q1[3] * q2_inv[3] - q1[0] * q2_inv[0] - \
+        q1[1] * q2_inv[1] - q1[2] * q2_inv[2]
+    x = q1[3] * q2_inv[0] + q1[0] * q2_inv[3] + \
+        q1[1] * q2_inv[2] - q1[2] * q2_inv[1]
+    y = q1[3] * q2_inv[1] - q1[0] * q2_inv[2] + \
+        q1[1] * q2_inv[3] + q1[2] * q2_inv[0]
+    z = q1[3] * q2_inv[2] + q1[0] * q2_inv[1] - \
+        q1[1] * q2_inv[0] + q1[2] * q2_inv[3]
+
+    q_diff = np.array([x, y, z, w])
+
+    return q_diff
+
+
+def rotate_quaternion(q1: Quaternion, q2: Quaternion):
+    q1 = np.array([q1.x, q1.y, q1.z, q1.w])
+    q2 = np.array([q2.x, q2.y, q2.z, q2.w])
+
+
 class State(Enum):
     """Current state of the pick_node node."""
 
@@ -334,7 +361,7 @@ class PickNode(Node):
             hole_pose.position.x = 0.2
             hole_pose.position.y = 0.4
             hole_pose.position.z = 0.015
-            await self.align_club_face(ball_pose, hole_pose)
+            await self.goal_club_tf(ball_pose, hole_pose)
             self.state = State.IDLE
         elif self.state == State.IDLE:
             pass
