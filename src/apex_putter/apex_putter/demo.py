@@ -64,7 +64,8 @@ class DemoNode(Node):
     async def home_callback(self, request, response):
         """Make the robot go to home pose"""
         self.get_logger().info("Home requested.")
-        await self.MPI.move_arm_joints(joint_values=[0.0, -0.4, 0.0, -1.6, 0.0, 1.57, 0.0])
+        await self.MPI.move_arm_joints(joint_values=[-0.4, -0.4, 0.0, -1.6, 0.0, 1.57, 0.0], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        self.v_h2b = self.calculate_hole_to_ball_vector()
         self.goal_club_tf()
         self.goal_ee_tf()
         return response
@@ -115,8 +116,8 @@ class DemoNode(Node):
         t.header.frame_id = 'base'
         t.child_frame_id = 'goal_face'
 
-        t.transform.translation.x = self.ball_position[0] + club_face_position[0]
-        t.transform.translation.y = self.ball_position[1] + club_face_position[1]
+        t.transform.translation.x = self.ball_position[0] + 0.05 * self.v_h2b[0]
+        t.transform.translation.y = self.ball_position[1] + 0.05 * self.v_h2b[1]
         t.transform.translation.z = self.ball_position[2]
         t.transform.rotation.x = club_face_orientation[0]
         t.transform.rotation.y = club_face_orientation[1]
@@ -133,8 +134,8 @@ class DemoNode(Node):
 
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.6
-        
+        t.transform.translation.z = 0.55
+
         dummy_orientation = quaternion_from_euler(np.pi, 0.0, 0.0)
         t.transform.rotation.x = dummy_orientation[0]
         t.transform.rotation.y = dummy_orientation[1]
@@ -148,16 +149,15 @@ class DemoNode(Node):
         self.get_logger().info("Ready requested.")
         self.get_logger().info("=============================================================")
 
-        self.v_h2b = self.calculate_hole_to_ball_vector()
+        # Look up the ideal ee transform first
+        ideal_ee_transform = self.tf_buffer.lookup_transform(self.base_frame, 'goal_ee', rclpy.time.Time())
+        ideal_pose = Pose()
+        ideal_pose.position.x = ideal_ee_transform.transform.translation.x
+        ideal_pose.position.y = ideal_ee_transform.transform.translation.y
+        ideal_pose.position.z = ideal_ee_transform.transform.translation.z
+        ideal_pose.orientation = ideal_ee_transform.transform.rotation
 
-        self.offset_ball_position(0.56)
-        ball_pose = Pose()
-        ball_pose.position.x = self.ball_position[0] + 0.1 * self.v_h2b[0]
-        ball_pose.position.y = self.ball_position[1] + 0.1 * self.v_h2b[1]
-        ball_pose.position.z = self.ball_position[2]
-        # make oritentation vertical downwards
-        ball_pose.orientation = Quaternion(x=0.92, y=-0.38, z=0.00035, w=0.0004)
-        await self.MPI.move_arm_pose(ball_pose, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        await self.MPI.move_arm_pose(ideal_pose, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
         return response
     
     async def putt_callback(self, request, response):
