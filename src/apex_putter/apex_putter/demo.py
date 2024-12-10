@@ -20,7 +20,7 @@ class DemoNode(Node):
         self.use_simulation_mode = self.get_parameter('simulation_mode').get_parameter_value().bool_value
 
         # Declare parameters for frames
-        self.declare_parameter('ball_tag_frame', 'ball')
+        self.declare_parameter('ball_tag_frame', 'ball_compensated')
         self.declare_parameter('hole_tag_frame', 'tag_15')
         self.declare_parameter('base_frame', 'robot_base_frame')
         self.declare_parameter('camera_frame', 'camera_link')

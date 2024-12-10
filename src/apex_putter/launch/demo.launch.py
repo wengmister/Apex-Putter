@@ -12,9 +12,9 @@ def generate_launch_description():
             launch_description_source=PathJoinSubstitution([
                 FindPackageShare('franka_fer_moveit_config'),
                 'launch',
-                'moveit_rviz.launch.py'
+                'demo.launch.py'
             ]),
-            launch_arguments={'robot_ip': 'panda0.robot'}.items()
+            # launch_arguments={'robot_ip': 'panda0.robot'}.items()
         ),
         IncludeLaunchDescription(
             launch_description_source=PathJoinSubstitution([

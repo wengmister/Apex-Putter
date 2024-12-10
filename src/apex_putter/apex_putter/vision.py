@@ -81,8 +81,9 @@ class Vision(Node):
 
         self.balls_detected_array = None # 2d pixel location
         self.balls_in_camera_frame = None # 3d camera frame location
+        self.compensated_balls_in_camera_frame = None # 3d camera frame location compensated
 
-        self.timer = self.create_timer(0.01, self.timer_callback)
+        self.timer = self.create_timer(0.001, self.timer_callback)
 
         markerQoS = QoSProfile(
             depth=10, durability=QoSDurabilityPolicy.VOLATILE)
@@ -244,16 +245,22 @@ class Vision(Node):
 
         # Now deproject into 3D
         balls_camera_frame = np.empty((0, 3))
-        for i in self.balls_detected_array:
-            i_x = i[0]
-            i_y = i[1]
-            x, y, z = self.deproject_depth_point(i_x, i_y)
-            # deprojected to ball centre.
-            x,y,z = transOps.deproject_ball_pose(dx=x,dy=y,dz=z,R=self.ball_radius)
-            i_array = np.array([x, y, z])
-            i_array = i_array/1000 # Convert to meters
-            balls_camera_frame = np.vstack((balls_camera_frame, i_array))
+        compensated_bcf = np.empty((0, 3))
+        if self.balls_detected_array is not None:
+            for i in self.balls_detected_array:
+                i_x = i[0]
+                i_y = i[1]
+                x, y, z = self.deproject_depth_point(i_x, i_y)
+                # deprojected to ball centre.
+                comp_x, comp_y, comp_z = transOps.compensate_ball_radius(dx=x,dy=y,dz=z,R=self.ball_radius)
+                i_array = np.array([x, y, z])
+                i_array = i_array/1000 # Convert to meters
+                balls_camera_frame = np.vstack((balls_camera_frame, i_array))
+                comp_i_array = np.array([comp_x, comp_y, comp_z])
+                comp_i_array = comp_i_array/1000 # Convert to meters
+                compensated_bcf = np.vstack((compensated_bcf, comp_i_array))
         self.balls_in_camera_frame = balls_camera_frame
+        self.compensated_balls_in_camera_frame = compensated_bcf
 
     def create_ball_marker(self, x, y, z):
         """
@@ -327,6 +334,21 @@ class Vision(Node):
                 camera_to_ball_transform.transform.translation.z = z
 
                 self.tf_broadcaster.sendTransform(camera_to_ball_transform)    
+
+        if self.compensated_balls_in_camera_frame is not None:
+            for i in self.compensated_balls_in_camera_frame:
+                x = i[0]
+                y = i[1]
+                z = i[2]
+                camera_to_ball_transform = TransformStamped()
+                camera_to_ball_transform.header.stamp = self.get_clock().now().to_msg()
+                camera_to_ball_transform.header.frame_id = 'camera_color_optical_frame'
+                camera_to_ball_transform.child_frame_id = 'ball_compensated'
+                camera_to_ball_transform.transform.translation.x = x
+                camera_to_ball_transform.transform.translation.y = y
+                camera_to_ball_transform.transform.translation.z = z
+
+                self.tf_broadcaster.sendTransform(camera_to_ball_transform)
 
     def timer_callback(self):
         self.publish_rbf()
