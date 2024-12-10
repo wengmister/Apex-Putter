@@ -116,8 +116,8 @@ class DemoNode(Node):
         t.header.frame_id = 'base'
         t.child_frame_id = 'goal_face'
 
-        t.transform.translation.x = self.ball_position[0] + 0.05 * self.v_h2b[0]
-        t.transform.translation.y = self.ball_position[1] + 0.05 * self.v_h2b[1]
+        t.transform.translation.x = self.ball_position[0] + 0.08 * self.v_h2b[0]
+        t.transform.translation.y = self.ball_position[1] + 0.08 * self.v_h2b[1]
         t.transform.translation.z = self.ball_position[2]
         t.transform.rotation.x = club_face_orientation[0]
         t.transform.rotation.y = club_face_orientation[1]
@@ -134,7 +134,7 @@ class DemoNode(Node):
 
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.60
+        t.transform.translation.z = 0.58
 
         dummy_orientation = quaternion_from_euler(np.pi, 0.0, 0.0)
         t.transform.rotation.x = dummy_orientation[0]
@@ -171,7 +171,34 @@ class DemoNode(Node):
         ideal_pose.position.z = ideal_ee_transform.transform.translation.z
         ideal_pose.orientation = ideal_ee_transform.transform.rotation
 
-        await self.MPI.move_arm_pose(ideal_pose, max_velocity_scaling_factor=0.75, max_acceleration_scaling_factor=0.75)
+        traj_vec = self.v_h2b
+        traj_mag = np.linalg.norm(traj_vec)
+        traj_unit = traj_vec / traj_mag 
+
+        def contruct_putt_pose(traj_unit, ideal_pose, scaling):
+            pose = Pose()
+            pose.position.x = ideal_pose.position.x - scaling * traj_unit[0]
+            pose.position.y = ideal_pose.position.y - scaling * traj_unit[1]
+            pose.position.z = ideal_pose.position.z
+            pose.orientation = ideal_pose.orientation
+            return pose
+
+        putt_pose_1 = contruct_putt_pose(traj_unit, ideal_pose, -0.1)
+
+        putt_pose_2 = contruct_putt_pose(traj_unit, ideal_pose, 0.11)
+
+        self.get_logger().info(f"putt_pose_1.{putt_pose_1}")
+        self.get_logger().info(f"putt_pose_2.{putt_pose_2}")
+
+        self.get_logger().info("Moving arm to putt.")
+
+        # future = await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+
+        # self.get_logger().info("Putt the ball.")
+        
+        # future_2 = await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.5)
+
+        await self.MPI.move_arm_cartesian([putt_pose_1, putt_pose_2], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
         return response
     
     def offset_ball_position(self, z):

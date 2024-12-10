@@ -119,7 +119,7 @@ def detected_obj_pose(T_camObj: Transform):
     # pose.orientation.w = -5.0747e-06
     return pose
 
-def deproject_ball_pose(dx,dy,dz, R=21):
+def compensate_ball_radius(dx,dy,dz, R=21):
     '''
     Input:
         (x_c, y_c, z_c) : camera pose
