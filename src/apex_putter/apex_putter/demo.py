@@ -197,6 +197,8 @@ class DemoNode(Node):
 
         club_face_tf = await self.MPI.get_transform('base', 'club_face')
         hole_tf = await self.MPI.get_transform('base', 'hole')
+        ee_tf = await self.MPI.get_transform('base', 'fer_link8')
+        ee_pose = ee_tf.pose
         hole_pose = hole_tf.pose
 
         club_face_pos = club_face_tf.pose.position
@@ -210,26 +212,26 @@ class DemoNode(Node):
         waypoints = []
         for i in range(5):
             pose = Pose()
-            pose.position.x = club_face_pos.x - i*0.02*traj_norm[0]
-            pose.position.y = club_face_pos.y - i*0.02*traj_norm[1]
-            pose.position.z = club_face_pos.z
-            pose.orientation = club_face_tf.pose.orientation
+            pose.position.x = ee_pose.position.x - i*0.03*traj_norm[0]
+            pose.position.y = ee_pose.position.y - i*0.03*traj_norm[1]
+            pose.position.z = ee_pose.position.z
+            pose.orientation = ee_pose.orientation
             waypoints.append(pose)
 
         for i in range(4, -1):
             pose = Pose()
-            pose.position.x = club_face_pos.x - i*0.02*traj_norm[0]
-            pose.position.y = club_face_pos.y - i*0.02*traj_norm[1]
-            pose.position.z = club_face_pos.z
-            pose.orientation = club_face_tf.pose.orientation
+            pose.position.x = ee_pose.position.x - i*0.03*traj_norm[0]
+            pose.position.y = ee_pose.position.y - i*0.03*traj_norm[1]
+            pose.position.z = ee_pose.position.z
+            pose.orientation = ee_pose.orientation
             waypoints.append(pose)
 
         for i in range(5):
             pose = Pose()
-            pose.position.x = club_face_pos.x + i*0.02*traj_norm[0]
-            pose.position.y = club_face_pos.y + i*0.02*traj_norm[1]
-            pose.position.z = club_face_pos.z
-            pose.orientation = club_face_tf.pose.orientation
+            pose.position.x = ee_pose.position.x + i*0.03*traj_norm[0]
+            pose.position.y = ee_pose.position.y + i*0.03*traj_norm[1]
+            pose.position.z = ee_pose.position.z
+            pose.orientation = ee_pose.orientation
             waypoints.append(pose)
 
         await self.MPI.move_arm_cartesian(waypoints)
