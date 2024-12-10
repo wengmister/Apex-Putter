@@ -185,7 +185,7 @@ class DemoNode(Node):
             pose.orientation = ideal_pose.orientation
             return pose
 
-        putt_pose_1 = contruct_putt_pose(traj_unit, ideal_pose, -0.1)
+        putt_pose_1 = contruct_putt_pose(traj_unit, ideal_pose, -0.15)
 
         putt_pose_2 = contruct_putt_pose(traj_unit, ideal_pose, 0.11)
 
@@ -194,11 +194,11 @@ class DemoNode(Node):
 
         self.get_logger().info("Moving arm to putt.")
 
-        future = await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        future = await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.15, max_acceleration_scaling_factor=0.15)
 
         # self.get_logger().info("Putt the ball.")
-        sleep(0.5)
-        future_2 = await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.5)
+        sleep(0.8)
+        future_2 = await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.4, max_acceleration_scaling_factor=0.4)
 
         # await self.MPI.move_arm_cartesian([putt_pose_1, putt_pose_2], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
         return response
