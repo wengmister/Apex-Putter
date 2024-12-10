@@ -48,9 +48,11 @@ class Vision(Node):
         self.atag_to_rbf_matrix = np.array([
             [0, 1, 0, 0.180],
             [0, 0, 1, -0.095],
-            [1, 0, 0, -0.009],
+            [1, 0, 0, -0.075],
             [0, 0, 0, 1]
         ])
+
+        self.ball_radius = 21 # mm
 
         self.atag_to_rbf_transform = transOps.htm_to_transform(self.atag_to_rbf_matrix)
 
@@ -80,7 +82,7 @@ class Vision(Node):
         self.balls_detected_array = None # 2d pixel location
         self.balls_in_camera_frame = None # 3d camera frame location
 
-        self.timer = self.create_timer(0.001, self.timer_callback)
+        self.timer = self.create_timer(0.01, self.timer_callback)
 
         markerQoS = QoSProfile(
             depth=10, durability=QoSDurabilityPolicy.VOLATILE)
@@ -246,6 +248,8 @@ class Vision(Node):
             i_x = i[0]
             i_y = i[1]
             x, y, z = self.deproject_depth_point(i_x, i_y)
+            # deprojected to ball centre.
+            x,y,z = transOps.deproject_ball_pose(dx=x,dy=y,dz=z,R=self.ball_radius)
             i_array = np.array([x, y, z])
             i_array = i_array/1000 # Convert to meters
             balls_camera_frame = np.vstack((balls_camera_frame, i_array))

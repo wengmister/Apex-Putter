@@ -57,6 +57,8 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        ball:
+          Value: true
         base:
           Value: true
         camera_color_frame:
@@ -99,7 +101,7 @@ Visualization Manager:
           Value: true
         robot_base_tag:
           Value: true
-        tag_36:
+        tag_15:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -110,30 +112,32 @@ Visualization Manager:
         camera_link:
           camera_color_frame:
             camera_color_optical_frame:
-              robot_base_tag:
-                robot_base_frame:
-                  base:
-                    fer_link0:
-                      fer_link1:
-                        fer_link2:
-                          fer_link3:
-                            fer_link4:
-                              fer_link5:
-                                fer_link6:
-                                  fer_link7:
-                                    fer_link8:
-                                      fer_hand:
-                                        fer_hand_tcp:
-                                          {}
-                                        fer_leftfinger:
-                                          {}
-                                        fer_rightfinger:
-                                          {}
-              tag_36:
+              ball:
+                {}
+              tag_15:
                 {}
           camera_depth_frame:
             camera_depth_optical_frame:
               {}
+        robot_base_tag:
+          robot_base_frame:
+            base:
+              fer_link0:
+                fer_link1:
+                  fer_link2:
+                    fer_link3:
+                      fer_link4:
+                        fer_link5:
+                          fer_link6:
+                            fer_link7:
+                              fer_link8:
+                                fer_hand:
+                                  fer_hand_tcp:
+                                    {}
+                                  fer_leftfinger:
+                                    {}
+                                  fer_rightfinger:
+                                    {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -263,25 +267,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 9.295866966247559
+      Distance: 4.779363632202148
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.12292494624853134
-        Y: -0.15648910403251648
-        Z: 0.19171008467674255
+        X: 1.0106104612350464
+        Y: 0.5780878067016602
+        Z: 0.24081119894981384
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7153981924057007
+      Pitch: 0.6003982424736023
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.8154001235961914
+      Yaw: 6.103581428527832
     Saved: ~
 Window Geometry:
   Camera:

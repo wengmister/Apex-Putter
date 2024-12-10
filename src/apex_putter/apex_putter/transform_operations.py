@@ -5,6 +5,7 @@ from transforms3d.quaternions import quat2mat, mat2quat
 from transforms3d.affines import compose, decompose
 import apex_putter.RobotState as RS
 from geometry_msgs.msg import Pose
+import math
 
 
 def htm_to_transform(htm: np.array) -> Transform:
@@ -123,6 +124,30 @@ def detected_obj_pose(T_camObj: Transform):
     # pose.orientation.z = -3.8634e-05
     # pose.orientation.w = -5.0747e-06
     return pose
+
+def deproject_ball_pose(dx,dy,dz, R=21):
+    '''
+    Input:
+        (x_c, y_c, z_c) : camera pose
+        (x_b, y_b, z_b) : ball pose
+        R: Radius of ball
+    Returns:
+        (x_r, y_r, z_r) : pose for center of the ball.
+    '''
+    # R: Radius of ball
+    
+    # Distance from the camera to the ball.
+    distance = math.sqrt(dx**2 + dy**2 + dz**2)
+    
+    # Scale the displacement to account for the radius of the ball.
+    scaling_factor = (distance + R) / distance
+    
+    # Coordinates of the ball center
+    x_r = dx * scaling_factor
+    y_r = dy * scaling_factor
+    z_r = dz * scaling_factor
+    
+    return x_r, y_r, z_r
 
 # Test functions
 
