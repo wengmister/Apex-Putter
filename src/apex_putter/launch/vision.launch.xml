@@ -4,7 +4,7 @@
         <arg name="align_depth.enable" value="true"/>
     </include> 
 
-    <node pkg="apriltag_ros" exec="apriltag_node" output="screen">
+    <node pkg="apriltag_ros" exec="apriltag_node" output="screen" args="--ros-args --log-level fatal">
         <remap from="image_rect" to="/camera/camera/color/image_raw" />
         <remap from="camera_info" to="/camera/camera/color/camera_info" />
         <param name="use_sim_time" value="false"/>
@@ -17,5 +17,5 @@
     <!-- YOLO node -->
     <node pkg="apex_putter" exec="yolo" output="log"/>
 
-    <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share apex_putter)/config/apriltag.rviz"/>
+    <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share apex_putter)/config/apriltag.rviz --ros-args --log-level fatal"/>
 </launch>

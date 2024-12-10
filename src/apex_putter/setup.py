@@ -10,7 +10,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch/', ['launch/vision.launch.xml']),
+        ('share/' + package_name + '/launch/', ['launch/vision.launch.xml',
+                                                'launch/demo.launch.py',]),
         ('share/' + package_name + '/config/', ['config/apriltag.rviz',
                                                 'launch/pickplace.launch.py',
                                                 'config/atag_ros.yaml'])
@@ -27,6 +28,7 @@ setup(
             'pick_node = apex_putter.pick_node:main',
             'vision = apex_putter.vision:main',
             'yolo = apex_putter.yolo:main',
+            'demo = apex_putter.demo:main',
         ],
     },
 )
