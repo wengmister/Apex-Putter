@@ -134,7 +134,7 @@ class DemoNode(Node):
 
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.55
+        t.transform.translation.z = 0.56
 
         dummy_orientation = quaternion_from_euler(np.pi, 0.0, 0.0)
         t.transform.rotation.x = dummy_orientation[0]
@@ -164,14 +164,14 @@ class DemoNode(Node):
         """Putt the fucking ball"""
         self.get_logger().info("Putt requested.")
         self.get_logger().info("=============================================================")
+        ideal_ee_transform = self.tf_buffer.lookup_transform(self.base_frame, 'goal_ee', rclpy.time.Time())
+        ideal_pose = Pose()
+        ideal_pose.position.x = ideal_ee_transform.transform.translation.x - 0.2 * self.v_h2b[0]
+        ideal_pose.position.y = ideal_ee_transform.transform.translation.y - 0.2 * self.v_h2b[1]
+        ideal_pose.position.z = ideal_ee_transform.transform.translation.z
+        ideal_pose.orientation = ideal_ee_transform.transform.rotation
 
-        putt_pose = Pose()
-        putt_pose.position.x = self.ball_position[0] - 0.2 * self.v_h2b[0]
-        putt_pose.position.y = self.ball_position[1] - 0.2 * self.v_h2b[1]
-        putt_pose.position.z = self.ball_position[2]
-        # make oritentation vertical downwards
-        putt_pose.orientation = Quaternion(x=0.92, y=-0.38, z=0.00035, w=0.0004)
-        await self.MPI.move_arm_pose(putt_pose, max_velocity_scaling_factor=0.8, max_acceleration_scaling_factor=0.8)
+        await self.MPI.move_arm_pose(ideal_pose, max_velocity_scaling_factor=0.75, max_acceleration_scaling_factor=0.75)
         return response
     
     def offset_ball_position(self, z):
