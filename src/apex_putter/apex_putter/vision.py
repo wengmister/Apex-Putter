@@ -239,6 +239,8 @@ class Vision(Node):
             x_new, y_new, z_new = result[0], result[1], result[2]
 
             return x_new, y_new, z_new
+        else:
+            return 0, 0, 0
 
     def ball_detection_callback(self, msg):
         """Callback for ball detection"""
@@ -371,7 +373,7 @@ class Vision(Node):
             tag15_dy = tag15_transform.transform.translation.y
             tag15_dz = tag15_transform.transform.translation.z
 
-            comp_dx, comp_dy, comp_dz = transOps.compensate_ball_radius(dx=tag15_dx, dy=tag15_dy, dz=tag15_dz, R=0.03)
+            comp_dx, comp_dy, comp_dz = transOps.compensate_ball_radius(dx=tag15_dx, dy=tag15_dy, dz=tag15_dz, R=0.05)
 
             target_transform = TransformStamped()
             target_transform.header.stamp = self.get_clock().now().to_msg()

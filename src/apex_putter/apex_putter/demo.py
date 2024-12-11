@@ -149,7 +149,7 @@ class DemoNode(Node):
 
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.56
+        t.transform.translation.z = 0.54
 
         dummy_orientation = quaternion_from_euler(np.pi, 0.0, 0.0)
         t.transform.rotation.x = dummy_orientation[0]
@@ -179,9 +179,9 @@ class DemoNode(Node):
         return response
 
     def calculate_putt_strength(self):
-        scaling_factor = 1.0
+        scaling_factor = 0.5
         distance = np.linalg.norm(self.v_h2b)
-        output = scaling_factor * distance
+        output = scaling_factor * distance + 0.2
         if output > 0.8:
             output = 0.8
         return output
@@ -243,7 +243,7 @@ class DemoNode(Node):
 
         self.get_logger().info(f"=====================Putt strength: {strength}=====================")    
 
-        await self.MPI.move_arm_cartesian(waypoints, max_velocity_scaling_factor=strength, max_acceleration_scaling_factor=strength * 0.8)
+        await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=strength, max_acceleration_scaling_factor=strength * 0.8)
         return response
     
     async def swing_callback(self, request, response):
