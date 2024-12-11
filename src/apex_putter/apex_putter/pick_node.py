@@ -230,6 +230,14 @@ class PickNode(Node):
         self.tf_static_broadcaster.sendTransform(t)
 
         # Create service
+        self.ready_srv = self.create_service(
+            Empty, 'ready', self.ready_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.home_srv = self.create_service(
+            Empty, 'home_robot', self.home_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.putt_srv = self.create_service(
+            Empty, 'putt', self.putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.swing_srv = self.create_service(
+            Empty, 'swing', self.swing_callback, callback_group=MutuallyExclusiveCallbackGroup())
         self.pick = self.create_service(Empty, 'pick', self.pick_callback,
                                         callback_group=MutuallyExclusiveCallbackGroup())
         self.test = self.create_service(
@@ -248,6 +256,99 @@ class PickNode(Node):
         await self.MPI.move_arm_joints(self.manipulator_pos[3])
         await self.MPI.open_gripper()
         await self.MPI.detach_object('object', 'fer_hand')
+        return response
+
+    async def home_callback(self, request, response):
+        """Make the robot go to home pose"""
+        self.get_logger().info("Home requested.")
+        await self.MPI.move_arm_joints(joint_values=[-0.4, -0.4, 0.0, -1.6, 0.0, 1.57, 0.0], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        ball_pose = Pose()
+        ball_pose.position.x = 0.3
+        ball_pose.position.y = 0.0
+        ball_pose.position.z = 0.021
+        hole_pose = Pose()
+        hole_pose.position.x = 0.2
+        hole_pose.position.y = 0.4
+        hole_pose.position.z = 0.015
+        self.goal_club_tf(ball_pose, hole_pose)
+        self.goal_ee_tf()
+        return response
+
+    async def ready_callback(self, request, response):
+        """Prepare the robot for putting"""
+        self.get_logger().info("Ready requested.")
+        self.get_logger().info("=============================================================")
+
+        # Look up the ideal ee transform first
+        ideal_pose = await self.MPI.get_transform('base', 'goal_ee')
+        self.get_logger().info("Ready done.")
+        self.get_logger().info("=============================================================")
+        # self.get_logger().info(ideal_pose)
+        # ball_tf = await self.MPI.get_transform('base', 'ball')
+        # await self.MPI.add_box('ball', (0.042, 0.042, 0.042), (ball_tf.pose.position.x, ball_tf.pose.position.y, ball_tf.pose.position.z))
+        await self.MPI.move_arm_pose(ideal_pose.pose, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        # await self.MPI.remove_box('ball')
+        self.get_logger().info("Ready done.")
+        self.get_logger().info("=============================================================")
+        return response
+
+    async def putt_callback(self, request, response):
+        club_face_tf = await self.MPI.get_transform('base', 'club_face')
+        hole_tf = await self.MPI.get_transform('base', 'hole')
+        ee_tf = await self.MPI.get_transform('base', 'fer_link8')
+        ee_pose = ee_tf.pose
+        hole_pose = hole_tf.pose
+
+        club_face_pos = club_face_tf.pose.position
+        hole_pos = hole_pose.position
+
+        traj_vec = np.array([hole_pos.x - club_face_pos.x,
+                             hole_pos.y - club_face_pos.y])
+        traj_mag = np.linalg.norm(traj_vec)
+        traj_norm = traj_vec / traj_mag
+
+        waypoints = []
+        for i in range(5):
+            pose = Pose()
+            pose.position.x = ee_pose.position.x - i*0.05*traj_norm[0]
+            pose.position.y = ee_pose.position.y - i*0.05*traj_norm[1]
+            pose.position.z = ee_pose.position.z
+            pose.orientation = ee_pose.orientation
+            waypoints.append(pose)
+
+        for i in range(4, -1):
+            pose = Pose()
+            pose.position.x = ee_pose.position.x - i*0.05*traj_norm[0]
+            pose.position.y = ee_pose.position.y - i*0.05*traj_norm[1]
+            pose.position.z = ee_pose.position.z
+            pose.orientation = ee_pose.orientation
+            waypoints.append(pose)
+
+        for i in range(5):
+            pose = Pose()
+            pose.position.x = ee_pose.position.x + i*0.05*traj_norm[0]
+            pose.position.y = ee_pose.position.y + i*0.05*traj_norm[1]
+            pose.position.z = ee_pose.position.z
+            pose.orientation = ee_pose.orientation
+            waypoints.append(pose)
+
+        await self.MPI.move_arm_cartesian(waypoints)
+        return response
+
+    async def swing_callback(self, request, response):
+        """Swing 'em!!"""
+        self.get_logger().info("Swing requested.")
+        self.get_logger().info("=============================================================")
+
+        # Look up the current joint configuration
+        current_robot_state = self.MPI.RobotState.get_robot_state()
+        current_joint_values = current_robot_state.joint_state.position
+
+        swung_joint_values = current_joint_values
+        swung_joint_values[4] = swung_joint_values[4] + np.pi/6
+
+        # Swing the putter
+        await self.MPI.move_arm_joints(joint_values=swung_joint_values, max_velocity_scaling_factor=0.6, max_acceleration_scaling_factor=0.6)
         return response
 
     async def test_callback(self, request, response):
@@ -297,7 +398,7 @@ class PickNode(Node):
         await self.MPI.move_arm_cartesian(waypoints)
         return response
 
-    async def goal_club_tf(self, ball_pose: Pose, hole_pose: Pose = None):
+    def goal_club_tf(self, ball_pose: Pose, hole_pose: Pose = None):
         radius = 0.045
         ball_pos = ball_pose.position
         hole_pos = hole_pose.position
@@ -316,15 +417,33 @@ class PickNode(Node):
         t.header.frame_id = 'base'
         t.child_frame_id = 'goal_face'
 
-        t.transform.translation.x = ball_pos.x + \
+        t.transform.translation.x = ball_pos.x - \
             0.05 * ball_hole_unit[0]
-        t.transform.translation.y = ball_pos.y + \
+        t.transform.translation.y = ball_pos.y - \
             0.05 * ball_hole_unit[1]
         t.transform.translation.z = ball_pos.z
         t.transform.rotation.x = club_face_orientation[0]
         t.transform.rotation.y = club_face_orientation[1]
         t.transform.rotation.z = club_face_orientation[2]
         t.transform.rotation.w = club_face_orientation[3]
+
+        self.tf_static_broadcaster.sendTransform(t)
+
+    def goal_ee_tf(self):
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'goal_face'
+        t.child_frame_id = 'goal_ee'
+
+        t.transform.translation.x = 0.0
+        t.transform.translation.y = 0.0
+        t.transform.translation.z = 0.58
+
+        dummy_orientation = quaternion_from_euler(np.pi, 0.0, 0.0)
+        t.transform.rotation.x = dummy_orientation[0]
+        t.transform.rotation.y = dummy_orientation[1]
+        t.transform.rotation.z = dummy_orientation[2]
+        t.transform.rotation.w = dummy_orientation[3]
 
         self.tf_static_broadcaster.sendTransform(t)
 
@@ -397,7 +516,7 @@ class PickNode(Node):
             hole_pose.position.x = 0.2
             hole_pose.position.y = 0.4
             hole_pose.position.z = 0.015
-            await self.goal_club_tf(ball_pose, hole_pose)
+            # await self.goal_club_tf(ball_pose, hole_pose)
             self.state = State.IDLE
         elif self.state == State.IDLE:
             pass

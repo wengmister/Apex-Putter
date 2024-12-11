@@ -298,7 +298,7 @@ class MotionPlanner():
             self.node.get_logger().info(f'None point type goal position provided: {
                 type(goal_position)} with val: {goal_position}.')
             goal_position = Point(
-                x=goal_position[0], y=goal_position[1], z=goal_position[2])
+                x=goal_position.x, y=goal_position.y, z=goal_position.z)
             self.node.get_logger().info(
                 f'Converted to point type goal position: {goal_position}')
 
