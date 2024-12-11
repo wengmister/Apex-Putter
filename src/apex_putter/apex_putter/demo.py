@@ -176,9 +176,9 @@ class DemoNode(Node):
         ideal_pose.position.z = ideal_ee_transform.transform.translation.z
         ideal_pose.orientation = ideal_ee_transform.transform.rotation
         ball_tf = await self.MPI.get_transform('base', 'ball')
-        await self.MPI.add_box('ball', (0.042, 0.042, 0.042), (ball_tf.pose.position.x, ball_tf.pose.position.y, ball_tf.pose.position.z))
+        # await self.MPI.add_box('ball', (0.042, 0.042, 0.042), (ball_tf.pose.position.x, ball_tf.pose.position.y, ball_tf.pose.position.z))
         await self.MPI.move_arm_pose(ideal_pose, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
-        await self.MPI.remove_box('ball')
+        # await self.MPI.remove_box('ball')
         return response
 
     async def putt_callback(self, request, response):
