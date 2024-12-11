@@ -14,6 +14,7 @@ def generate_launch_description():
                 FindPackageShare('franka_fer_moveit_config'),
                 'launch',
                 'moveit_rviz.launch.py'
+                # 'demo.launch.py'
             ]),
             launch_arguments={'robot_ip': 'panda0.robot'}.items()
         ),

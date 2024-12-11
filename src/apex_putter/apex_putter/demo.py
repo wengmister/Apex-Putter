@@ -8,6 +8,7 @@ from geometry_msgs.msg import TransformStamped
 import tf2_ros
 from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 import apex_putter.transform_operations as transOps
+from time import sleep
 
 from tf_transformations import quaternion_from_euler
 
@@ -22,8 +23,8 @@ class DemoNode(Node):
             'simulation_mode').get_parameter_value().bool_value
 
         # Declare parameters for frames
-        self.declare_parameter('ball_tag_frame', 'ball')
-        self.declare_parameter('hole_tag_frame', 'tag_15')
+        self.declare_parameter('ball_tag_frame', 'ball_compensated')
+        self.declare_parameter('hole_tag_frame', 'target')
         self.declare_parameter('base_frame', 'robot_base_frame')
         self.declare_parameter('camera_frame', 'camera_link')
 
@@ -64,6 +65,8 @@ class DemoNode(Node):
             Empty, 'home_robot', self.home_callback, callback_group=MutuallyExclusiveCallbackGroup())
         self.putt_srv = self.create_service(
             Empty, 'putt', self.putt_callback, callback_group=MutuallyExclusiveCallbackGroup())
+        self.swing_srv = self.create_service(
+            Empty, 'swing', self.swing_callback, callback_group=MutuallyExclusiveCallbackGroup())
 
         # Timer for optional tasks
         # self.timer = self.create_timer(0.1, self.timer_callback)
@@ -133,9 +136,9 @@ class DemoNode(Node):
         t.child_frame_id = 'goal_face'
 
         t.transform.translation.x = self.ball_position[0] + \
-            0.05 * self.v_h2b[0]
+            0.08 * self.v_h2b[0]
         t.transform.translation.y = self.ball_position[1] + \
-            0.05 * self.v_h2b[1]
+            0.08 * self.v_h2b[1]
         t.transform.translation.z = self.ball_position[2]
         t.transform.rotation.x = club_face_orientation[0]
         t.transform.rotation.y = club_face_orientation[1]
@@ -152,7 +155,7 @@ class DemoNode(Node):
 
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.55
+        t.transform.translation.z = 0.58
 
         dummy_orientation = quaternion_from_euler(np.pi, 0.0, 0.0)
         t.transform.rotation.x = dummy_orientation[0]
@@ -185,57 +188,60 @@ class DemoNode(Node):
         """Putt the fucking ball"""
         self.get_logger().info("Putt requested.")
         self.get_logger().info("=============================================================")
+        ideal_ee_transform = self.tf_buffer.lookup_transform(
+            self.base_frame, 'goal_ee', rclpy.time.Time())
+        ideal_pose = Pose()
+        ideal_pose.position.x = ideal_ee_transform.transform.translation.x - \
+            0.2 * self.v_h2b[0]
+        ideal_pose.position.y = ideal_ee_transform.transform.translation.y - \
+            0.2 * self.v_h2b[1]
+        ideal_pose.position.z = ideal_ee_transform.transform.translation.z
+        ideal_pose.orientation = ideal_ee_transform.transform.rotation
 
-        # putt_pose = Pose()
-        # putt_pose.position.x = self.ball_position[0] - 0.2 * self.v_h2b[0]
-        # putt_pose.position.y = self.ball_position[1] - 0.2 * self.v_h2b[1]
-        # putt_pose.position.z = self.ball_position[2]
-        # # make oritentation vertical downwards
-        # putt_pose.orientation = Quaternion(
-        #     x=0.92, y=-0.38, z=0.00035, w=0.0004)
-        # await self.MPI.move_arm_pose(putt_pose, max_velocity_scaling_factor=0.8, max_acceleration_scaling_factor=0.8)
-
-        club_face_tf = await self.MPI.get_transform('base', 'club_face')
-        hole_tf = await self.MPI.get_transform('base', 'hole')
-        ee_tf = await self.MPI.get_transform('base', 'fer_link8')
-        ee_pose = ee_tf.pose
-        hole_pose = hole_tf.pose
-
-        club_face_pos = club_face_tf.pose.position
-        hole_pos = hole_pose.position
-
-        traj_vec = np.array([hole_pos.x - club_face_pos.x,
-                             hole_pos.y - club_face_pos.y])
+        traj_vec = self.v_h2b
         traj_mag = np.linalg.norm(traj_vec)
-        traj_norm = traj_vec / traj_mag
+        traj_unit = traj_vec / traj_mag
 
-        waypoints = []
-        for i in range(5):
+        def contruct_putt_pose(vector, ideal_pose, scaling):
             pose = Pose()
-            pose.position.x = ee_pose.position.x - i*0.03*traj_norm[0]
-            pose.position.y = ee_pose.position.y - i*0.03*traj_norm[1]
-            pose.position.z = ee_pose.position.z
-            pose.orientation = ee_pose.orientation
-            waypoints.append(pose)
+            pose.position.x = ideal_pose.position.x - scaling * vector[0]
+            pose.position.y = ideal_pose.position.y - scaling * vector[1]
+            pose.position.z = ideal_pose.position.z
+            pose.orientation = ideal_pose.orientation
+            return pose
 
-        for i in range(4, -1):
-            pose = Pose()
-            pose.position.x = ee_pose.position.x - i*0.03*traj_norm[0]
-            pose.position.y = ee_pose.position.y - i*0.03*traj_norm[1]
-            pose.position.z = ee_pose.position.z
-            pose.orientation = ee_pose.orientation
-            waypoints.append(pose)
+        # putt_pose_1 = contruct_putt_pose(traj_unit, ideal_pose, -0.15)
 
-        for i in range(5):
-            pose = Pose()
-            pose.position.x = ee_pose.position.x + i*0.03*traj_norm[0]
-            pose.position.y = ee_pose.position.y + i*0.03*traj_norm[1]
-            pose.position.z = ee_pose.position.z
-            pose.orientation = ee_pose.orientation
-            waypoints.append(pose)
+        putt_pose_2 = contruct_putt_pose(traj_unit, ideal_pose, 0.11)
 
-        await self.MPI.move_arm_cartesian(waypoints)
+        # self.get_logger().info(f"putt_pose_1.{putt_pose_1}")
+        self.get_logger().info(f"putt_pose_2.{putt_pose_2}")
 
+        self.get_logger().info("Moving arm to putt.")
+
+        # await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.15, max_acceleration_scaling_factor=0.15)
+
+        # self.get_logger().info("Putt the ball.")
+        # sleep(0.8)
+        await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.4)
+
+        # await self.MPI.move_arm_cartesian([putt_pose_1, putt_pose_2], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        return response
+
+    async def swing_callback(self, request, response):
+        """Swing 'em!!"""
+        self.get_logger().info("Swing requested.")
+        self.get_logger().info("=============================================================")
+
+        # Look up the current joint configuration
+        current_robot_state = self.MPI.RobotState.get_robot_state()
+        current_joint_values = current_robot_state.joint_state.position
+
+        swung_joint_values = current_joint_values
+        swung_joint_values[4] = swung_joint_values[4] + np.pi/6
+
+        # Swing the putter
+        await self.MPI.move_arm_joints(joint_values=swung_joint_values, max_velocity_scaling_factor=0.6, max_acceleration_scaling_factor=0.6)
         return response
 
     def offset_ball_position(self, z):
