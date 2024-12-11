@@ -109,10 +109,10 @@ class DemoNode(Node):
         t.header.frame_id = 'base'
         t.child_frame_id = 'goal_face'
 
-        t.transform.translation.x = self.ball_position[0] - \
-            0.05 * ball_hole_unit[0]
-        t.transform.translation.y = self.ball_position[1] - \
-            0.05 * ball_hole_unit[1]
+        t.transform.translation.x = self.ball_position[0] + \
+            0.08 * self.v_h2b[0]
+        t.transform.translation.y = self.ball_position[1] + \
+            0.08 * self.v_h2b[1]
         t.transform.translation.z = self.ball_position[2]
         t.transform.rotation.x = club_face_orientation[0]
         t.transform.rotation.y = club_face_orientation[1]
@@ -129,7 +129,7 @@ class DemoNode(Node):
 
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.58
+        t.transform.translation.z = 0.54
 
         dummy_orientation = quaternion_from_euler(np.pi, 0.0, 0.0)
         t.transform.rotation.x = dummy_orientation[0]
@@ -144,54 +144,61 @@ class DemoNode(Node):
         self.get_logger().info("Ready requested.")
         self.get_logger().info("=============================================================")
 
-        ideal_pose = self.MPI.get_transform(self.base_frame, 'goal_ee')
-        await self.MPI.move_arm_pose(ideal_pose.pose, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        # Look up the ideal ee transform first
+        ideal_ee_transform = self.tf_buffer.lookup_transform(
+            self.base_frame, 'goal_ee', rclpy.time.Time())
+        ideal_pose = Pose()
+        ideal_pose.position.x = ideal_ee_transform.transform.translation.x
+        ideal_pose.position.y = ideal_ee_transform.transform.translation.y
+        ideal_pose.position.z = ideal_ee_transform.transform.translation.z
+        ideal_pose.orientation = ideal_ee_transform.transform.rotation
+        ball_tf = await self.MPI.get_transform('base', 'ball')
+        # await self.MPI.add_box('ball', (0.042, 0.042, 0.042), (ball_tf.pose.position.x, ball_tf.pose.position.y, ball_tf.pose.position.z))
+        await self.MPI.move_arm_pose(ideal_pose, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        # await self.MPI.remove_box('ball')
         return response
+
+    def calculate_putt_strength(self):
+        scaling_factor = 0.5
+        distance = np.linalg.norm(self.v_h2b)
+        output = scaling_factor * distance + 0.2
+        if output > 0.8:
+            output = 0.8
+        return output
 
     async def putt_callback(self, request, response):
         """Putt the fucking ball"""
         self.get_logger().info("Putt requested.")
         self.get_logger().info("=============================================================")
-        club_face_tf = self.MPI.get_transform('base', 'club_face')
-        hole_tf = self.MPI.get_transform('base', 'hole')
-        ee_tf = self.MPI.get_transform('base', 'fer_link8')
-        ee_pose = ee_tf.pose
-        hole_pose = hole_tf.pose
+        ideal_ee_transform = self.tf_buffer.lookup_transform(
+            self.base_frame, 'goal_ee', rclpy.time.Time())
+        ideal_pose = Pose()
+        ideal_pose.position.x = ideal_ee_transform.transform.translation.x - \
+            0.2 * self.v_h2b[0]
+        ideal_pose.position.y = ideal_ee_transform.transform.translation.y - \
+            0.2 * self.v_h2b[1]
+        ideal_pose.position.z = ideal_ee_transform.transform.translation.z
+        ideal_pose.orientation = ideal_ee_transform.transform.rotation
 
-        club_face_pos = club_face_tf.pose.position
-        hole_pos = hole_pose.position
-
-        traj_vec = np.array([hole_pos.x - club_face_pos.x,
-                             hole_pos.y - club_face_pos.y])
+        traj_vec = self.v_h2b
         traj_mag = np.linalg.norm(traj_vec)
-        traj_norm = traj_vec / traj_mag
+        traj_unit = traj_vec / traj_mag
 
-        waypoints = []
-        for i in range(5):
+        def contruct_putt_pose(vector, ideal_pose, scaling):
             pose = Pose()
-            pose.position.x = ee_pose.position.x - i*0.05*traj_norm[0]
-            pose.position.y = ee_pose.position.y - i*0.05*traj_norm[1]
-            pose.position.z = ee_pose.position.z
-            pose.orientation = ee_pose.orientation
-            waypoints.append(pose)
+            pose.position.x = ideal_pose.position.x - scaling * vector[0]
+            pose.position.y = ideal_pose.position.y - scaling * vector[1]
+            pose.position.z = ideal_pose.position.z
+            pose.orientation = ideal_pose.orientation
+            return pose
 
-        for i in range(4, -1):
-            pose = Pose()
-            pose.position.x = ee_pose.position.x - i*0.05*traj_norm[0]
-            pose.position.y = ee_pose.position.y - i*0.05*traj_norm[1]
-            pose.position.z = ee_pose.position.z
-            pose.orientation = ee_pose.orientation
-            waypoints.append(pose)
+        putt_pose_2 = contruct_putt_pose(traj_unit, ideal_pose, 0.11)
+        strength = self.calculate_putt_strength()
 
-        for i in range(5):
-            pose = Pose()
-            pose.position.x = ee_pose.position.x + i*0.05*traj_norm[0]
-            pose.position.y = ee_pose.position.y + i*0.05*traj_norm[1]
-            pose.position.z = ee_pose.position.z
-            pose.orientation = ee_pose.orientation
-            waypoints.append(pose)
+        self.get_logger().info(f"=====================Putt strength: {
+            strength}=====================")
 
-        await self.MPI.move_arm_cartesian(waypoints)
+        await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=strength, max_acceleration_scaling_factor=strength * 0.8)
         return response
 
     async def swing_callback(self, request, response):

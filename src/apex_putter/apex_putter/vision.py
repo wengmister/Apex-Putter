@@ -47,21 +47,22 @@ class Vision(Node):
         # Known transform from apriltag to robot base
         self.atag_to_rbf_matrix = np.array([
             [0, 1, 0, 0.180],
-            [0, 0, 1, -0.095],
+            [0, 0, 1, -0.125],
             [1, 0, 0, -0.075],
             [0, 0, 0, 1]
         ])
 
         self.ball_radius = 21  # mm
 
-        # self.atag_to_rbf_transform = transOps.htm_to_transform(self.atag_to_rbf_matrix)
+        self.atag_to_rbf_transform = transOps.htm_to_transform(
+            self.atag_to_rbf_matrix)
 
         # Calibrated transform
         # GOLDEN
-        self.atag_to_rbf_transform = Transform()
-        self.atag_to_rbf_transform.translation.x = 0.14786748434243768
-        self.atag_to_rbf_transform.translation.y = -0.07150813692793156
-        self.atag_to_rbf_transform.translation.z = -0.009117968748594274
+        # self.atag_to_rbf_transform = Transform()
+        self.atag_to_rbf_transform.translation.x = 0.180
+        self.atag_to_rbf_transform.translation.y = -0.120
+        self.atag_to_rbf_transform.translation.z = -0.075
         self.atag_to_rbf_transform.rotation.x = -0.49032395482128516
         self.atag_to_rbf_transform.rotation.y = -0.49049696252323216
         self.atag_to_rbf_transform.rotation.z = -0.5028613983824991
@@ -241,6 +242,8 @@ class Vision(Node):
             x_new, y_new, z_new = result[0], result[1], result[2]
 
             return x_new, y_new, z_new
+        else:
+            return 0, 0, 0
 
     def ball_detection_callback(self, msg):
         """Callback for ball detection"""
@@ -376,8 +379,8 @@ class Vision(Node):
             tag15_dy = tag15_transform.transform.translation.y
             tag15_dz = tag15_transform.transform.translation.z
 
-            comp_dx, comp_dy, comp_dz = transOps.compensate_ball_radius(
-                dx=tag15_dx, dy=tag15_dy, dz=tag15_dz, R=0.03)
+            comp_dx, comp_dy, comp_dz = transOps.compensate_target_position(
+                tag15_dx, tag15_dy, tag15_dz)
 
             target_transform = TransformStamped()
             target_transform.header.stamp = self.get_clock().now().to_msg()

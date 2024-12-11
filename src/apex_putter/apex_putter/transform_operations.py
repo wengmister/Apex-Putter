@@ -138,16 +138,23 @@ def compensate_ball_radius(dx,dy,dz, R=21):
     
     # Distance from the camera to the ball.
     distance = math.sqrt(dx**2 + dy**2 + dz**2)
+
+    if distance == 0:
+        # When the ball is not initialized
+        return 0, 0, 0
+    else:
+        # Scale the displacement to account for the radius of the ball.
+        scaling_factor = (distance + R) / distance
+        
+        # Coordinates of the ball center
+        x_r = dx * scaling_factor
+        y_r = dy * scaling_factor
+        z_r = dz * scaling_factor
+        
+        return x_r, y_r, z_r
     
-    # Scale the displacement to account for the radius of the ball.
-    scaling_factor = (distance + R) / distance
-    
-    # Coordinates of the ball center
-    x_r = dx * scaling_factor
-    y_r = dy * scaling_factor
-    z_r = dz * scaling_factor
-    
-    return x_r, y_r, z_r
+def compensate_target_position(x, y, z):
+    return x, y-0.05, z +0.05
 
 # Test functions
 

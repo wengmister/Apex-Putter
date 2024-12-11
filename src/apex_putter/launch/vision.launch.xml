@@ -16,6 +16,4 @@
 
     <!-- YOLO node -->
     <node pkg="apex_putter" exec="yolo" output="log"/>
-
-    <node pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share apex_putter)/config/apriltag.rviz --ros-args --log-level fatal"/>
 </launch>
