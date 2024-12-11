@@ -12,7 +12,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch/', ['launch/vision.launch.xml',
                                                 'launch/demo.launch.py',
-                                                'launch/pickplace.launch.py']),
+                                                'launch/calibration.launch.xml']),
         ('share/' + package_name + '/config/', ['config/apriltag.rviz',
                                                 'config/atag_ros.yaml'])
     ],
@@ -31,6 +31,7 @@ setup(
             'vision = apex_putter.vision:main',
             'yolo = apex_putter.yolo:main',
             'demo = apex_putter.demo:main',
+            'calibration = apex_putter.calibration:main',
         ],
     },
 )

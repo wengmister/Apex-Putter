@@ -54,7 +54,19 @@ class Vision(Node):
 
         self.ball_radius = 21 # mm
 
-        self.atag_to_rbf_transform = transOps.htm_to_transform(self.atag_to_rbf_matrix)
+        # self.atag_to_rbf_transform = transOps.htm_to_transform(self.atag_to_rbf_matrix)
+
+        # Calibrated transform
+        # GOLDEN
+        self.atag_to_rbf_transform = Transform()
+        self.atag_to_rbf_transform.translation.x=0.14786748434243768
+        self.atag_to_rbf_transform.translation.y=-0.07150813692793156
+        self.atag_to_rbf_transform.translation.z=-0.009117968748594274
+        self.atag_to_rbf_transform.rotation.x=-0.49032395482128516
+        self.atag_to_rbf_transform.rotation.y=-0.49049696252323216
+        self.atag_to_rbf_transform.rotation.z=-0.5028613983824991
+        self.atag_to_rbf_transform.rotation.w=0.5158735921722442
+
 
         # TF listener
         self.tf_buffer = tf2_ros.buffer.Buffer()
@@ -81,8 +93,9 @@ class Vision(Node):
 
         self.balls_detected_array = None # 2d pixel location
         self.balls_in_camera_frame = None # 3d camera frame location
+        self.compensated_balls_in_camera_frame = None # 3d camera frame location compensated
 
-        self.timer = self.create_timer(0.01, self.timer_callback)
+        self.timer = self.create_timer(0.001, self.timer_callback)
 
         markerQoS = QoSProfile(
             depth=10, durability=QoSDurabilityPolicy.VOLATILE)
@@ -244,16 +257,22 @@ class Vision(Node):
 
         # Now deproject into 3D
         balls_camera_frame = np.empty((0, 3))
-        for i in self.balls_detected_array:
-            i_x = i[0]
-            i_y = i[1]
-            x, y, z = self.deproject_depth_point(i_x, i_y)
-            # deprojected to ball centre.
-            x,y,z = transOps.deproject_ball_pose(dx=x,dy=y,dz=z,R=self.ball_radius)
-            i_array = np.array([x, y, z])
-            i_array = i_array/1000 # Convert to meters
-            balls_camera_frame = np.vstack((balls_camera_frame, i_array))
+        compensated_bcf = np.empty((0, 3))
+        if self.balls_detected_array is not None:
+            for i in self.balls_detected_array:
+                i_x = i[0]
+                i_y = i[1]
+                x, y, z = self.deproject_depth_point(i_x, i_y)
+                # deprojected to ball centre.
+                comp_x, comp_y, comp_z = transOps.compensate_ball_radius(dx=x,dy=y,dz=z,R=self.ball_radius)
+                i_array = np.array([x, y, z])
+                i_array = i_array/1000 # Convert to meters
+                balls_camera_frame = np.vstack((balls_camera_frame, i_array))
+                comp_i_array = np.array([comp_x, comp_y, comp_z])
+                comp_i_array = comp_i_array/1000 # Convert to meters
+                compensated_bcf = np.vstack((compensated_bcf, comp_i_array))
         self.balls_in_camera_frame = balls_camera_frame
+        self.compensated_balls_in_camera_frame = compensated_bcf
 
     def create_ball_marker(self, x, y, z):
         """
@@ -328,10 +347,49 @@ class Vision(Node):
 
                 self.tf_broadcaster.sendTransform(camera_to_ball_transform)    
 
+        if self.compensated_balls_in_camera_frame is not None:
+            for i in self.compensated_balls_in_camera_frame:
+                x = i[0]
+                y = i[1]
+                z = i[2]
+                camera_to_ball_transform = TransformStamped()
+                camera_to_ball_transform.header.stamp = self.get_clock().now().to_msg()
+                camera_to_ball_transform.header.frame_id = 'camera_color_optical_frame'
+                camera_to_ball_transform.child_frame_id = 'ball_compensated'
+                camera_to_ball_transform.transform.translation.x = x
+                camera_to_ball_transform.transform.translation.y = y
+                camera_to_ball_transform.transform.translation.z = z
+
+                self.tf_broadcaster.sendTransform(camera_to_ball_transform)
+    
+    def publish_target_transform(self):
+        """Offset the target marker by a distance"""
+        # Look up tag15 transform
+        try:
+            tag15_transform = self.tf_buffer.lookup_transform('camera_color_optical_frame', 'tag_15', rclpy.time.Time())
+            tag15_dx = tag15_transform.transform.translation.x
+            tag15_dy = tag15_transform.transform.translation.y
+            tag15_dz = tag15_transform.transform.translation.z
+
+            comp_dx, comp_dy, comp_dz = transOps.compensate_ball_radius(dx=tag15_dx, dy=tag15_dy, dz=tag15_dz, R=0.03)
+
+            target_transform = TransformStamped()
+            target_transform.header.stamp = self.get_clock().now().to_msg()
+            target_transform.header.frame_id = 'camera_color_optical_frame'
+            target_transform.child_frame_id = 'target'
+            target_transform.transform.translation.x = comp_dx
+            target_transform.transform.translation.y = comp_dy
+            target_transform.transform.translation.z = comp_dz
+            
+            self.tf_broadcaster.sendTransform(target_transform)
+        except:
+            self.get_logger().debug("Error looking up tag_15 transform")
+
     def timer_callback(self):
         self.publish_rbf()
         self.drop_ball_marker()
         self.publish_ball_transform()
+        self.publish_target_transform()
 
 def main(args=None):
     rclpy.init(args=args)
