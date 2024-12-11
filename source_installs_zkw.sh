@@ -26,10 +26,10 @@ source_and_check() {
 }
 
 # Directory paths
-APEX_PUTTER_DIR="$HOME/me495/final_project/Apex-Putter"
+APEX_PUTTER_DIR="$HOME/mech_eng_495_ws/src/final/Apex-Putter"
 FRANKA_WS_DIR="$HOME/ws/franka"
 VENV_ROS_DIR="$HOME/venv_ros"
-CALIBRATION_ROS_DIR="$HOME/easy_handeye2_ws"
+# CALIBRATION_ROS_DIR="$HOME/easy_handeye2_ws"
 
 # Source Apex-Putter setup
 if ! source_and_check "$APEX_PUTTER_DIR/install/setup.bash" "Apex-Putter"; then
@@ -46,9 +46,9 @@ if ! source_and_check "$VENV_ROS_DIR/install/setup.bash" "ROS virtual environmen
     exit 1
 fi
 
-# Source easy handeye
-if ! source_and_check "$CALIBRATION_ROS_DIR/install/setup.bash" "easy handeye"; then
-    exit 1
-fi
+# # Source easy handeye
+# if ! source_and_check "$CALIBRATION_ROS_DIR/install/setup.bash" "easy handeye"; then
+#     exit 1
+# fi
 
 echo "All environments successfully sourced!"
