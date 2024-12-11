@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose
-import apex_putter.MotionPlanningInterface as MotionPlanningInterface
+from apex_putter.MotionPlanningInterface import MotionPlanningInterface
 import numpy as np
 from tf2_ros import TransformListener, Buffer
 from geometry_msgs.msg import TransformStamped
@@ -65,14 +65,15 @@ class Calibrator(Node):
         self.generate_all_poses()
         self.pose_counter = 0
 
-    def move_callback(self, request, response):
+    async def move_callback(self, request, response):
+        """Async service callback for moving to the next pose."""
         if self.pose_counter >= len(self.pose_list):
             response.success = False
             response.message = "All poses visited"
             return response
             
         current_pose = self.pose_list[self.pose_counter]
-        success = self.MPI.move_to_pose(current_pose)
+        success = await self.MPI.move_arm_pose(current_pose)
         
         if success:
             self.pose_counter += 1
@@ -85,10 +86,12 @@ class Calibrator(Node):
         return response
 
     def generate_all_poses(self):
-        # Generate poses by linspacing in x = [0.2, 0.5], y = [-0.5, 0.5], z = [0.2, 0.5]
-        x = np.linspace(0.2, 0.5, 3)
-        y = np.linspace(-0.5, 0.5, 3)
-        z = np.linspace(0.2, 0.5, 3)
+        """Generate 18 poses in a grid pattern with specified ranges"""
+        # Generate poses by linspacing in x = [0.4, 0.6], y = [-0.4, 0.4], z = [0.2, 0.5]
+        # Create 18 poses by adjusting the number of points in each dimension
+        x = np.linspace(0.4, 0.6, 2)  # 3 points
+        y = np.linspace(-0.3, 0.3, 3)  # 3 points
+        z = np.linspace(0.3, 0.5, 3)  # 2 points to get 3*3*2 = 18 poses
         
         self.pose_list = []
         for xi in x:
@@ -97,15 +100,20 @@ class Calibrator(Node):
                     self.pose_list.append(self.generate_pose(xi, yi, zi))
 
     def generate_pose(self, x, y, z):
+        """Generate a pose with position and orientation (180° rotation about z-axis)"""
         pose = Pose()
         pose.position.x = x
         pose.position.y = y
         pose.position.z = z
-        # Set orientation to pointing downward
-        pose.orientation.x = 0.0
-        pose.orientation.y = 1.0
-        pose.orientation.z = 0.0
+        
+        # Set orientation to pointing downward with 180° rotation about z-axis
+        # This is equivalent to rotating the end-effector 180° about its z-axis
+        # from the downward-pointing position
+        pose.orientation.x = 1.0
+        pose.orientation.y = 0.0  # Negative y to rotate 180° about z
+        pose.orientation.z = 0.2
         pose.orientation.w = 0.0
+        
         return pose
 
     def save_data_callback(self, request, response):

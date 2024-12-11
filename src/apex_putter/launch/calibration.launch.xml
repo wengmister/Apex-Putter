@@ -1,0 +1,7 @@
+<launch>
+  <include file="$(find-pkg-share apex_putter)/launch/vision.launch.xml">
+  </include>
+
+  <node pkg="apex_putter" exec="calibration" name="calibration" output="screen">
+  </node>
+</launch>
