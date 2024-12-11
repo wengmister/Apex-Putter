@@ -371,7 +371,7 @@ class Vision(Node):
             
             self.tf_broadcaster.sendTransform(target_transform)
         except:
-            self.get_logger().error("Error looking up tag_15 transform")
+            self.get_logger().debug("Error looking up tag_15 transform")
 
     def timer_callback(self):
         self.publish_rbf()
