@@ -67,15 +67,22 @@ class DemoNode(Node):
         # Timer for optional tasks
         # self.timer = self.create_timer(0.1, self.timer_callback)
 
-        self.get_logger().info("DemoNode initialized. Use '/simulate' or '/real_putt'.")
+        self.default_goal_face_transform = None
+        self.default_goal_ee_transform = None
+
+
+        self.get_logger().info("DemoNode initialized.")
+        self.get_logger().info("Use '/ready' to get into putt position, '/home_robot' to return to our home position, or '/swing' or '/putt' to putt the ball.")
 
     async def home_callback(self, request, response):
         """Make the robot go to home pose"""
         self.get_logger().info("Home requested.")
         await self.MPI.move_arm_joints(joint_values=[-0.4, -0.4, 0.0, -1.6, 0.0, 1.57, 0.0], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
-        self.v_h2b = self.calculate_hole_to_ball_vector()
-        self.goal_club_tf()
-        self.goal_ee_tf()
+        # self.v_h2b = self.calculate_hole_to_ball_vector()
+        # self.goal_club_tf()
+        # self.goal_ee_tf()
+
+        self.restore_default_transforms()
         return response
 
     def look_up_ball_in_base_frame(self):
@@ -140,6 +147,16 @@ class DemoNode(Node):
         t.transform.rotation.w = club_face_orientation[3]
 
         self.tf_static_broadcaster.sendTransform(t)
+    
+        # If default is not set yet, store it:
+        if self.default_goal_face_transform is None:
+            self.default_goal_face_transform = (t.transform.translation.x,
+                                                t.transform.translation.y,
+                                                t.transform.translation.z,
+                                                t.transform.rotation.x,
+                                                t.transform.rotation.y,
+                                                t.transform.rotation.z,
+                                                t.transform.rotation.w)
 
     def goal_ee_tf(self):
         t = TransformStamped()
@@ -158,6 +175,49 @@ class DemoNode(Node):
         t.transform.rotation.w = dummy_orientation[3]
 
         self.tf_static_broadcaster.sendTransform(t)
+
+            # If default is not set yet, store it:
+        if self.default_goal_ee_transform is None:
+            self.default_goal_ee_transform = (t.transform.translation.x,
+                                            t.transform.translation.y,
+                                            t.transform.translation.z,
+                                            t.transform.rotation.x,
+                                            t.transform.rotation.y,
+                                            t.transform.rotation.z,
+                                            t.transform.rotation.w)
+            
+    def restore_default_transforms(self):
+        # goal_face
+        if self.default_goal_face_transform is not None:
+            x, y, z, rx, ry, rz, rw = self.default_goal_face_transform
+            t = TransformStamped()
+            t.header.stamp = self.get_clock().now().to_msg()
+            t.header.frame_id = 'base'
+            t.child_frame_id = 'goal_face'
+            t.transform.translation.x = x
+            t.transform.translation.y = y
+            t.transform.translation.z = z
+            t.transform.rotation.x = rx
+            t.transform.rotation.y = ry
+            t.transform.rotation.z = rz
+            t.transform.rotation.w = rw
+            self.tf_static_broadcaster.sendTransform(t)
+
+        # goal_ee
+        if self.default_goal_ee_transform is not None:
+            x, y, z, rx, ry, rz, rw = self.default_goal_ee_transform
+            t = TransformStamped()
+            t.header.stamp = self.get_clock().now().to_msg()
+            t.header.frame_id = 'goal_face'
+            t.child_frame_id = 'goal_ee'
+            t.transform.translation.x = x
+            t.transform.translation.y = y
+            t.transform.translation.z = z
+            t.transform.rotation.x = rx
+            t.transform.rotation.y = ry
+            t.transform.rotation.z = rz
+            t.transform.rotation.w = rw
+            self.tf_static_broadcaster.sendTransform(t)
 
     async def ready_callback(self, request, response):
         """Prepare the robot for putting"""
