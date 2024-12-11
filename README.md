@@ -8,8 +8,6 @@ Project repo for ME495 Final Project Group 3, 2024 Fall
 - Jueun Kwon
 - Sayantani Bhattacharya 
 
-
-
 ## Overview
 Miniature golf, even in its simplest form on a flat surface, presents an intriguing challenge for robotic systems. In this setup, a Franka Panda robot arm attempts the fundamental task of golf putting - striking a ball with just the right force to reach the hole. While humans develop this skill through intuition and practice, programming a robot to achieve the same feat requires precise control of position, force, and timing.
 
