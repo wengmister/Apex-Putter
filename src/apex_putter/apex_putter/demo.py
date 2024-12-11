@@ -179,7 +179,7 @@ class DemoNode(Node):
         return response
 
     def calculate_putt_strength(self):
-        scaling_factor = 0.5
+        scaling_factor = 0.65
         distance = np.linalg.norm(self.v_h2b)
         output = scaling_factor * distance + 0.2
         if output > 0.8:

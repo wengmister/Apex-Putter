@@ -62,8 +62,8 @@ class Vision(Node):
         self.atag_to_rbf_transform.translation.x=0.180
         self.atag_to_rbf_transform.translation.y=-0.120
         self.atag_to_rbf_transform.translation.z=-0.075
-        self.atag_to_rbf_transform.rotation.x=-0.49032395482128516
-        self.atag_to_rbf_transform.rotation.y=-0.49049696252323216
+        self.atag_to_rbf_transform.rotation.x=-0.5
+        self.atag_to_rbf_transform.rotation.y=-0.52
         self.atag_to_rbf_transform.rotation.z=-0.5028613983824991
         self.atag_to_rbf_transform.rotation.w=0.5158735921722442
 
