@@ -18,4 +18,4 @@
         tag:
             ids: [9, 15, 36]            # tag ID
             frames: [robot_base_tag, tag_15, tag_36]  # optional frame name
-            sizes: [0.078, 0.047, 0.047]   # optional tag-specific edge size
+            sizes: [0.078, 0.046, 0.078]   # optional tag-specific edge size
