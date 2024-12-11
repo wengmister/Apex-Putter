@@ -12,11 +12,9 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch/', ['launch/vision.launch.xml',
                                                 'launch/demo.launch.py',
-<<<<<<< HEAD
-                                                'launch/pickplace.launch.py']),
-=======
-                                                'launch/calibration.launch.xml']),
->>>>>>> main
+                                                'launch/pickplace.launch.py',
+                                                'launch/calibration.launch.xml',
+                                                'launch/demo_cp.launch.py']),
         ('share/' + package_name + '/config/', ['config/apriltag.rviz',
                                                 'config/atag_ros.yaml'])
     ],
@@ -29,13 +27,13 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            # 'pick_node = apex_putter.pick_node:main',
             'demo_node = apex_putter.demo_node:main',
             'pick_node = apex_putter.pick_node:main',
             'vision = apex_putter.vision:main',
             'yolo = apex_putter.yolo:main',
             'demo = apex_putter.demo:main',
             'calibration = apex_putter.calibration:main',
+            'demo_cp = apex_putter.demo_cp:main'
         ],
     },
 )

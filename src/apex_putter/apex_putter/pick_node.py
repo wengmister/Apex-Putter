@@ -280,7 +280,7 @@ class PickNode(Node):
         self.get_logger().info("=============================================================")
 
         # Look up the ideal ee transform first
-        ideal_pose = await self.MPI.get_transform('base', 'goal_ee')
+        ideal_pose = self.MPI.get_transform('base', 'goal_ee')
         self.get_logger().info("Ready done.")
         self.get_logger().info("=============================================================")
         # self.get_logger().info(ideal_pose)
@@ -293,9 +293,9 @@ class PickNode(Node):
         return response
 
     async def putt_callback(self, request, response):
-        club_face_tf = await self.MPI.get_transform('base', 'club_face')
-        hole_tf = await self.MPI.get_transform('base', 'hole')
-        ee_tf = await self.MPI.get_transform('base', 'fer_link8')
+        club_face_tf = self.MPI.get_transform('base', 'club_face')
+        hole_tf = self.MPI.get_transform('base', 'hole')
+        ee_tf = self.MPI.get_transform('base', 'fer_link8')
         ee_pose = ee_tf.pose
         hole_pose = hole_tf.pose
 
@@ -353,12 +353,9 @@ class PickNode(Node):
 
     async def test_callback(self, request, response):
         """Test."""
-        # transform_operations.detected obj pose -> goal pose.
-        # await self.MPI.move_arm_pose(goal_pose=self.pose)
-        # await self.MPI.move_arm_cartesian(waypoints=self.waypoints)
-        club_face_tf = await self.MPI.get_transform('base', 'club_face')
-        hole_tf = await self.MPI.get_transform('base', 'hole')
-        ee_tf = await self.MPI.get_transform('base', 'fer_link8')
+        club_face_tf = self.MPI.get_transform('base', 'club_face')
+        hole_tf = self.MPI.get_transform('base', 'hole')
+        ee_tf = self.MPI.get_transform('base', 'fer_link8')
         ee_pose = ee_tf.pose
         hole_pose = hole_tf.pose
 

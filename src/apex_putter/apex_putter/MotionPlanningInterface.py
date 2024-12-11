@@ -82,7 +82,7 @@ class MotionPlanningInterface():
     async def move_arm_cartesian(self, waypoints, start_pose=None, max_velocity_scaling_factor=0.1, max_acceleration_scaling_factor=0.1, avoid_collisions=True):
         """Move arm using a cartesian path."""
         if start_pose is None:
-            start_pose = await self.RobotState.get_current_end_effector_pose()
+            start_pose = self.RobotState.get_current_end_effector_pose()
         start_state = await self.RobotState.compute_inverse_kinematics(curr_pose=start_pose.pose, group_name=self.arm_move_group)
         print("start_state passed.")
         traj = await self.MotionPlanner.plan_cartesian_path_async(
@@ -223,8 +223,8 @@ class MotionPlanningInterface():
     async def get_current_end_effector_pose(self):
         return await self.RobotState.get_current_end_effector_pose()
 
-    async def get_transform(self, base_frame, end_frame):
-        return await self.RobotState.get_transform(base_frame, end_frame)
+    def get_transform(self, base_frame, end_frame):
+        return self.RobotState.get_transform(base_frame, end_frame)
 
     # PlanningScene functions
     async def add_box(self, box_id, size, position, orientation=(0.0, 0.0, 0.0, 1.0), frame_id='base'):

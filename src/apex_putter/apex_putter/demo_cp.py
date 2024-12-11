@@ -44,7 +44,7 @@ class DemoNode(Node):
         # Motion planning interface
         self.MPI = MotionPlanningInterface(
             node=self,
-            base_frame=self.base_frame,
+            base_frame='base',
             end_effector_frame='fer_link8'
         )
 
@@ -57,6 +57,23 @@ class DemoNode(Node):
 
         # Static broadcaster for ball and club face
         self.tf_static_broadcaster = tf2_ros.StaticTransformBroadcaster(self)
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
+
+        t = TransformStamped()
+
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'fer_link8'
+        t.child_frame_id = 'club_face'
+
+        t.transform.translation.x = float(0.02)
+        t.transform.translation.y = float(0.0)
+        t.transform.translation.z = float(0.52)
+        t.transform.rotation.x = 0.0  # 0.659466
+        t.transform.rotation.y = 0.0  # -0.215248
+        t.transform.rotation.z = 0.0  # 0.719827
+        t.transform.rotation.w = 1.0  # 0.0249158
+
+        self.tf_static_broadcaster.sendTransform(t)
 
         # Services
         self.ready_srv = self.create_service(
@@ -96,7 +113,7 @@ class DemoNode(Node):
     def goal_club_tf(self):
         radius = 0.045
         ball_hole_vec = self.calculate_hole_to_ball_vector()
-        ball_hole_vec = -ball_hole_vec
+        ball_hole_vec = ball_hole_vec
         theta_hole_ball = np.arctan2(ball_hole_vec[1], ball_hole_vec[0])
         ball_hole_mag = np.linalg.norm(ball_hole_vec)
         ball_hole_unit = ball_hole_vec / ball_hole_mag
@@ -144,7 +161,7 @@ class DemoNode(Node):
         self.get_logger().info("Ready requested.")
         self.get_logger().info("=============================================================")
 
-        ideal_pose = self.MPI.get_transform(self.base_frame, 'goal_ee')
+        ideal_pose = self.MPI.get_transform('base', 'goal_ee')
         await self.MPI.move_arm_pose(ideal_pose.pose, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
         return response
 
@@ -153,7 +170,7 @@ class DemoNode(Node):
         self.get_logger().info("Putt requested.")
         self.get_logger().info("=============================================================")
         club_face_tf = self.MPI.get_transform('base', 'club_face')
-        hole_tf = self.MPI.get_transform('base', 'hole')
+        hole_tf = self.MPI.get_transform('base', self.hole_tag_frame)
         ee_tf = self.MPI.get_transform('base', 'fer_link8')
         ee_pose = ee_tf.pose
         hole_pose = hole_tf.pose
@@ -215,8 +232,30 @@ class DemoNode(Node):
         self.ball_position[2] += z
 
     def timer_callback(self):
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'base'
+        t.child_frame_id = self.ball_tag_frame
+
+        t.transform.translation.x = 0.35
+        t.transform.translation.y = 0.0
+        t.transform.translation.z = 0.01
+
+        self.tf_broadcaster.sendTransform(t)
+
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'base'
+        t.child_frame_id = self.hole_tag_frame
+
+        t.transform.translation.x = 0.25
+        t.transform.translation.y = 0.4
+        t.transform.translation.z = 0.01
+
+        self.tf_broadcaster.sendTransform(t)
+
         ball_pose = self.MPI.get_transform(
-            self.base_frame, self.ball_tag_frame)
+            'base', self.ball_tag_frame)
         if ball_pose is not None:
             self.ball_position = np.array(
                 [ball_pose.pose.position.x, ball_pose.pose.position.y, ball_pose.pose.position.z])
