@@ -152,6 +152,9 @@ def compensate_ball_radius(dx,dy,dz, R=21):
         z_r = dz * scaling_factor
         
         return x_r, y_r, z_r
+    
+def compensate_target_position(x, y, z):
+    return x, y-0.05, z +0.05
 
 # Test functions
 

@@ -173,9 +173,9 @@ class DemoNode(Node):
         ideal_pose.position.z = ideal_ee_transform.transform.translation.z
         ideal_pose.orientation = ideal_ee_transform.transform.rotation
         ball_tf = await self.MPI.get_transform('base', 'ball')
-        await self.MPI.add_box('ball', (0.042, 0.042, 0.042), (ball_tf.pose.position.x, ball_tf.pose.position.y, ball_tf.pose.position.z))
+        # await self.MPI.add_box('ball', (0.042, 0.042, 0.042), (ball_tf.pose.position.x, ball_tf.pose.position.y, ball_tf.pose.position.z))
         await self.MPI.move_arm_pose(ideal_pose, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
-        await self.MPI.remove_box('ball')
+        # await self.MPI.remove_box('ball')
         return response
 
     def calculate_putt_strength(self):
@@ -210,35 +210,7 @@ class DemoNode(Node):
             pose.orientation = ideal_pose.orientation
             return pose
         
-        # Test to get waypoints for cartesian paths
-        start_scale = -0.15 # Negative Scale first / could probably start at 0
-        end_scale = 0.11
-
-        num_waypoints = 5
-        scaling_waypoints = np.linspace(start_scale, end_scale, num=num_waypoints)
-
-        waypoints = []
-        for s in scaling_waypoints:
-            w_pose = contruct_putt_pose(traj_unit, ideal_pose, s)
-            waypoints.append(w_pose)
-
-        self.get_logger().info(f"Waypoints Planned:{waypoints}")
-        self.get_logger().info("Attempting to Putt in Cartesian Path")
-
-        # putt_pose_1 = contruct_putt_pose(traj_unit, ideal_pose, -0.15)
-
         putt_pose_2 = contruct_putt_pose(traj_unit, ideal_pose, 0.11)
-
-        # self.get_logger().info(f"putt_pose_1.{putt_pose_1}")
-        self.get_logger().info(f"putt_pose_2.{putt_pose_2}")
-
-        self.get_logger().info("Moving arm to putt.")
-
-        # await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.15, max_acceleration_scaling_factor=0.15)
-
-        # self.get_logger().info("Putt the ball.")
-        # sleep(0.8)
-        # await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.4)
         strength = self.calculate_putt_strength()
 
         self.get_logger().info(f"=====================Putt strength: {strength}=====================")    

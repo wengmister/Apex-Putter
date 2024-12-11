@@ -35,10 +35,20 @@ def generate_launch_description():
             package='rviz2',
             executable='rviz2',
             output='log',
-            arguments=['-d', PathJoinSubstitution(
-                [FindPackageShare('apex_putter'), 'config',
-                 'apriltag.rviz']), '--ros-args --log-level fatal'],
-            parameters=[moveit_config.planning_pipelines,
-                        moveit_config.robot_description_kinematics],
+            arguments=[
+                '-d',
+                PathJoinSubstitution([
+                    FindPackageShare('apex_putter'),
+                    'config',
+                    'apriltag.rviz'
+                ]),
+                '--ros-args',
+                '--log-level',
+                'fatal'
+            ],
+            parameters=[
+                moveit_config.planning_pipelines,
+                moveit_config.robot_description_kinematics
+            ],
         )
     ])

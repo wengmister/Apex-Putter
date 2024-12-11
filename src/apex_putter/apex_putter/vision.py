@@ -373,7 +373,7 @@ class Vision(Node):
             tag15_dy = tag15_transform.transform.translation.y
             tag15_dz = tag15_transform.transform.translation.z
 
-            comp_dx, comp_dy, comp_dz = transOps.compensate_ball_radius(dx=tag15_dx, dy=tag15_dy, dz=tag15_dz, R=0.05)
+            comp_dx, comp_dy, comp_dz = transOps.compensate_target_position(tag15_dx, tag15_dy, tag15_dz)
 
             target_transform = TransformStamped()
             target_transform.header.stamp = self.get_clock().now().to_msg()
