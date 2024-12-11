@@ -54,7 +54,19 @@ class Vision(Node):
 
         self.ball_radius = 21 # mm
 
-        self.atag_to_rbf_transform = transOps.htm_to_transform(self.atag_to_rbf_matrix)
+        # self.atag_to_rbf_transform = transOps.htm_to_transform(self.atag_to_rbf_matrix)
+
+        # Calibrated transform
+        # GOLDEN
+        self.atag_to_rbf_transform = Transform()
+        self.atag_to_rbf_transform.translation.x=0.14786748434243768
+        self.atag_to_rbf_transform.translation.y=-0.07150813692793156
+        self.atag_to_rbf_transform.translation.z=-0.009117968748594274
+        self.atag_to_rbf_transform.rotation.x=-0.49032395482128516
+        self.atag_to_rbf_transform.rotation.y=-0.49049696252323216
+        self.atag_to_rbf_transform.rotation.z=-0.5028613983824991
+        self.atag_to_rbf_transform.rotation.w=0.5158735921722442
+
 
         # TF listener
         self.tf_buffer = tf2_ros.buffer.Buffer()
