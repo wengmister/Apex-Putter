@@ -12,13 +12,15 @@ from time import sleep
 
 from tf_transformations import quaternion_from_euler
 
+
 class DemoNode(Node):
     def __init__(self):
         super().__init__('demo_node')
 
         # Parameter to toggle simulation vs real-world
         self.declare_parameter('simulation_mode', True)
-        self.use_simulation_mode = self.get_parameter('simulation_mode').get_parameter_value().bool_value
+        self.use_simulation_mode = self.get_parameter(
+            'simulation_mode').get_parameter_value().bool_value
 
         # Declare parameters for frames
         self.declare_parameter('ball_tag_frame', 'ball_compensated')
@@ -26,10 +28,14 @@ class DemoNode(Node):
         self.declare_parameter('base_frame', 'robot_base_frame')
         self.declare_parameter('camera_frame', 'camera_link')
 
-        self.ball_tag_frame = self.get_parameter('ball_tag_frame').get_parameter_value().string_value
-        self.hole_tag_frame = self.get_parameter('hole_tag_frame').get_parameter_value().string_value
-        self.base_frame = self.get_parameter('base_frame').get_parameter_value().string_value
-        self.camera_frame = self.get_parameter('camera_frame').get_parameter_value().string_value
+        self.ball_tag_frame = self.get_parameter(
+            'ball_tag_frame').get_parameter_value().string_value
+        self.hole_tag_frame = self.get_parameter(
+            'hole_tag_frame').get_parameter_value().string_value
+        self.base_frame = self.get_parameter(
+            'base_frame').get_parameter_value().string_value
+        self.camera_frame = self.get_parameter(
+            'camera_frame').get_parameter_value().string_value
 
         # Known offsets:
         self.putter_length = 22.85 * 0.0254  # About 0.58 m
@@ -71,14 +77,17 @@ class DemoNode(Node):
         self.goal_club_tf()
         self.goal_ee_tf()
         return response
-    
+
     def look_up_ball_in_base_frame(self):
         """Look up the ball position in the base frame"""
         self.get_logger().info("Looking up ball position in base frame.")
         try:
-            transform_base_ball = self.tf_buffer.lookup_transform(self.base_frame, self.ball_tag_frame, rclpy.time.Time())
-            self.get_logger().info(f"Transform from {self.ball_tag_frame} to {self.base_frame}: {transform_base_ball}")
-            htm_base_ball = transOps.transform_to_htm(transform_base_ball.transform)
+            transform_base_ball = self.tf_buffer.lookup_transform(
+                self.base_frame, self.ball_tag_frame, rclpy.time.Time())
+            self.get_logger().info(f"Transform from {self.ball_tag_frame} to {
+                self.base_frame}: {transform_base_ball}")
+            htm_base_ball = transOps.transform_to_htm(
+                transform_base_ball.transform)
             self.ball_position = htm_base_ball[:3, 3]
             self.get_logger().info(f"Ball position: {self.ball_position}")
         except Exception as e:
@@ -88,9 +97,12 @@ class DemoNode(Node):
         """Look up the hole position in the base frame"""
         self.get_logger().info("Looking up hole position in base frame.")
         try:
-            transform_base_hole = self.tf_buffer.lookup_transform(self.base_frame, self.hole_tag_frame, rclpy.time.Time())
-            self.get_logger().info(f"Transform from {self.hole_tag_frame} to {self.base_frame}: {transform_base_hole}")
-            htm_base_hole = transOps.transform_to_htm(transform_base_hole.transform)
+            transform_base_hole = self.tf_buffer.lookup_transform(
+                self.base_frame, self.hole_tag_frame, rclpy.time.Time())
+            self.get_logger().info(f"Transform from {self.hole_tag_frame} to {
+                self.base_frame}: {transform_base_hole}")
+            htm_base_hole = transOps.transform_to_htm(
+                transform_base_hole.transform)
             self.hole_position = htm_base_hole[:3, 3]
             self.get_logger().info(f"Hole position: {self.hole_position}")
         except Exception as e:
@@ -100,9 +112,10 @@ class DemoNode(Node):
         """Calculate the vector from the hole to the ball"""
         self.look_up_ball_in_base_frame()
         self.look_up_hole_in_base_frame()
-        self.hole_position[2] = self.ball_position[2] # flatten the hole position on z-axis
-        return self.ball_position - self.hole_position # vector: hole to ball
-    
+        # flatten the hole position on z-axis
+        self.hole_position[2] = self.ball_position[2]
+        return self.ball_position - self.hole_position  # vector: hole to ball
+
     def goal_club_tf(self):
         radius = 0.045
         ball_hole_vec = -self.calculate_hole_to_ball_vector()
@@ -136,7 +149,7 @@ class DemoNode(Node):
 
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.58
+        t.transform.translation.z = 0.54
 
         dummy_orientation = quaternion_from_euler(np.pi, 0.0, 0.0)
         t.transform.rotation.x = dummy_orientation[0]
@@ -145,23 +158,35 @@ class DemoNode(Node):
         t.transform.rotation.w = dummy_orientation[3]
 
         self.tf_static_broadcaster.sendTransform(t)
-        
+
     async def ready_callback(self, request, response):
         """Prepare the robot for putting"""
         self.get_logger().info("Ready requested.")
         self.get_logger().info("=============================================================")
 
         # Look up the ideal ee transform first
-        ideal_ee_transform = self.tf_buffer.lookup_transform(self.base_frame, 'goal_ee', rclpy.time.Time())
+        ideal_ee_transform = self.tf_buffer.lookup_transform(
+            self.base_frame, 'goal_ee', rclpy.time.Time())
         ideal_pose = Pose()
         ideal_pose.position.x = ideal_ee_transform.transform.translation.x
         ideal_pose.position.y = ideal_ee_transform.transform.translation.y
         ideal_pose.position.z = ideal_ee_transform.transform.translation.z
         ideal_pose.orientation = ideal_ee_transform.transform.rotation
-
+        ball_tf = await self.MPI.get_transform('base', 'ball')
+        # await self.MPI.add_box('ball', (0.042, 0.042, 0.042), (ball_tf.pose.position.x, ball_tf.pose.position.y, ball_tf.pose.position.z))
         await self.MPI.move_arm_pose(ideal_pose, max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        # await self.MPI.remove_box('ball')
         return response
-    
+
+    def calculate_putt_strength(self):
+        scaling_factor = 0.65
+        distance = np.linalg.norm(self.v_h2b)
+        output = scaling_factor * distance + 0.2
+        if output > 0.8:
+            output = 0.8
+        return output
+
+
     async def putt_callback(self, request, response):
         """Putt the fucking ball"""
         self.get_logger().info("Putt requested.")
@@ -184,23 +209,13 @@ class DemoNode(Node):
             pose.position.z = ideal_pose.position.z
             pose.orientation = ideal_pose.orientation
             return pose
-
-        # putt_pose_1 = contruct_putt_pose(traj_unit, ideal_pose, -0.15)
-
+        
         putt_pose_2 = contruct_putt_pose(traj_unit, ideal_pose, 0.11)
+        strength = self.calculate_putt_strength()
 
-        # self.get_logger().info(f"putt_pose_1.{putt_pose_1}")
-        self.get_logger().info(f"putt_pose_2.{putt_pose_2}")
+        self.get_logger().info(f"=====================Putt strength: {strength}=====================")    
 
-        self.get_logger().info("Moving arm to putt.")
-
-        # await self.MPI.move_arm_pose(putt_pose_1, max_velocity_scaling_factor=0.15, max_acceleration_scaling_factor=0.15)
-
-        # self.get_logger().info("Putt the ball.")
-        # sleep(0.8)
-        await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=0.5, max_acceleration_scaling_factor=0.4)
-
-        # await self.MPI.move_arm_cartesian([putt_pose_1, putt_pose_2], max_velocity_scaling_factor=0.2, max_acceleration_scaling_factor=0.2)
+        await self.MPI.move_arm_pose(putt_pose_2, max_velocity_scaling_factor=strength, max_acceleration_scaling_factor=strength * 0.8)
         return response
     
     async def swing_callback(self, request, response):
@@ -218,16 +233,18 @@ class DemoNode(Node):
         # Swing the putter
         await self.MPI.move_arm_joints(joint_values=swung_joint_values, max_velocity_scaling_factor=0.6, max_acceleration_scaling_factor=0.6)
         return response
-    
+
     def offset_ball_position(self, z):
         """Offset the ball position by z"""
         self.ball_position[2] += z
+
 
 def main(args=None):
     rclpy.init(args=args)
     node = DemoNode()
     rclpy.spin(node)
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

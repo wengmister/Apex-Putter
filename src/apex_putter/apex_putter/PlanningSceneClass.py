@@ -1,7 +1,9 @@
+from asyncio import Future
 from geometry_msgs.msg import Pose
 from moveit_msgs.msg import AttachedCollisionObject, CollisionObject
 from moveit_msgs.msg import PlanningScene as PlanningMsg
 from moveit_msgs.srv import ApplyPlanningScene
+import rclpy
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.node import Node
 from shape_msgs.msg import SolidPrimitive
@@ -76,6 +78,87 @@ class PlanningSceneClass:
         # Apply the collision object to the planning scene
         result = await self._apply_collision_object(collision_object)
         return result
+
+    async def add_sphere_async(self, sphere_id, radius, position, orientation=(0.0, 0.0, 0.0, 1.0), frame_id='base'):
+        """
+        Adds a sphere to the planning scene asynchronously.
+        """
+        self.node.get_logger().info("add_sphere_async()")
+
+        collision_object = CollisionObject()
+        collision_object.id = sphere_id
+        collision_object.header.frame_id = frame_id
+
+        # Define the sphere shape
+        sphere = SolidPrimitive()
+        sphere.type = SolidPrimitive.SPHERE
+        # For a sphere, dimensions[0] is the radius
+        sphere.dimensions = [radius]
+
+        # Define the sphere pose
+        sphere_pose = Pose()
+        sphere_pose.position.x, sphere_pose.position.y, sphere_pose.position.z = position
+        sphere_pose.orientation.x, sphere_pose.orientation.y, sphere_pose.orientation.z, sphere_pose.orientation.w = orientation
+
+        collision_object.primitives = [sphere]
+        collision_object.primitive_poses = [sphere_pose]
+        collision_object.operation = CollisionObject.ADD
+
+        # Apply the collision object to the planning scene
+        result = await self._apply_collision_object(collision_object)
+        return result
+
+    def add_sphere(self, sphere_id, radius, position, orientation=(0.0, 0.0, 0.0, 1.0), frame_id='base'):
+        """
+        Adds a sphere to the planning scene synchronously.
+        This method creates an async task and returns a Future that you can wait on.
+        """
+        self.node.get_logger().info("add_sphere()")
+        executor = rclpy.get_global_executor()
+
+        if executor is None:
+            raise RuntimeError(
+                "No executor is running. Make sure rclpy.init() has been called")
+
+        # Create a new future for this request
+        self.future = Future()
+
+        executor.create_task(
+            self.add_sphere_async(
+                sphere_id,
+                radius,
+                position,
+                orientation,
+                frame_id
+            )
+        ).add_done_callback(self.done_callback)
+
+        self.node.get_logger().info('Task done')
+
+        return self.future
+
+
+    def remove_box(self, box_id, frame_id='base'):
+        self.node.get_logger().info("remove_box()")
+        executor = rclpy.get_global_executor()
+
+        if executor is None:
+            raise RuntimeError(
+                "No executor is running. Make sure rclpy.init() has been called")
+
+        # Create a new future for this request
+        self.future = Future()
+
+        executor.create_task(
+            self.remove_box_async(
+                box_id,
+                frame_id
+            )
+        ).add_done_callback(self.done_callback)
+
+        self.node.get_logger().info('Task done')
+
+        return self.future
 
     async def attach_object_async(self, object_id, link_name):
         """Attach a collision object to the robot's end-effector synchronously."""

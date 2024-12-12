@@ -1,5 +1,7 @@
 # Apex-Putter
+
 Project repo for Group 3's Final Project for the 2024 Fall installment of Northweestern's ME495 Course.
+
 
 ## Authors:
 - Zhengyang Kris Weng
@@ -7,7 +9,6 @@ Project repo for Group 3's Final Project for the 2024 Fall installment of Northw
 - Kyle Puckett
 - Jueun Kwon
 - Sayantani Bhattacharya 
-
 
 
 ## Overview
@@ -48,7 +49,6 @@ Main ROS2 Nodes:
         - Putter compensation
     - MoveIt! motion callbacks
 
-## Sample Usage
 0. Follow `DEPENDENCIES.md` to setup your environment b) Source environment with `source_installs_zkw.sh` - please update with your paths c) Start Franka on station
 1. `ros2 launch apex_putter demo.launch.py`
 2. `ros2 service call /home_robot std_srvs/srv/Empty`
@@ -63,4 +63,3 @@ https://github.com/user-attachments/assets/c37d6d04-b3b5-417b-8256-89fccbd9d821
 Live Demonstrations:
 
 https://github.com/user-attachments/assets/ca9eafb5-67a2-44d8-abbf-b2a758cc1057
-

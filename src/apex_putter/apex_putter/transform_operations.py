@@ -3,8 +3,10 @@ from rclpy.node import Node
 from geometry_msgs.msg import Transform, TransformStamped
 from transforms3d.quaternions import quat2mat, mat2quat
 from transforms3d.affines import compose, decompose
+import apex_putter.RobotState as RS
 from geometry_msgs.msg import Pose
 import math
+
 
 def htm_to_transform(htm: np.array) -> Transform:
     """
@@ -13,7 +15,7 @@ def htm_to_transform(htm: np.array) -> Transform:
     # Decompose the result
     translation, rotation, _, _ = decompose(htm)
     quaternion = mat2quat(rotation)  # Returns w,x,y,z
-    
+
     # Create and populate result transform
     result = Transform()
     result.translation.x = float(translation[0])
@@ -25,6 +27,7 @@ def htm_to_transform(htm: np.array) -> Transform:
     result.rotation.z = float(quaternion[3])
 
     return result
+
 
 def transform_to_htm(transform: Transform) -> np.array:
     '''
@@ -46,18 +49,19 @@ def transform_to_htm(transform: Transform) -> np.array:
     ])
     rotation_matrix = quat2mat(quaternion)
     htm = np.eye(4)
-    htm[0:3, 0:3] = rotation_matrix 
-    htm[0:3, 3] = translation 
+    htm[0:3, 0:3] = rotation_matrix
+    htm[0:3, 3] = translation
     return htm
+
 
 def combine_transforms(known_matrix: np.array, tag_transform: TransformStamped) -> Transform:
     """
     Combines a known transform matrix with a TF2 transform in ROS2
-    
+
     Args:
         known_transform (4x4 np.array): A known homogeneous transformation matrix.
         tf2_transform (TransformStamped): Transform from TF2
-        
+
     Returns:
         Transform: The resulting combined transform
     """
@@ -76,13 +80,14 @@ def combine_transforms(known_matrix: np.array, tag_transform: TransformStamped) 
     ])
     tf2_scale = np.ones(3)
     tf2_matrix = compose(tf2_translation, tf2_rotation, tf2_scale)
-    
+
     # Combine transforms through matrix multiplication
     result_matrix = np.matmul(tf2_matrix, known_matrix)
-    
+
     result = htm_to_transform(result_matrix)
-    
+
     return result
+
 
 def obj_in_bot_frame(T_camObj):
     '''
@@ -92,8 +97,9 @@ def obj_in_bot_frame(T_camObj):
     '''
     # Write the fixed frame transform here.
     T_botCam = np.array([0])
-    T_objBot = np.dot(np.linalg.inv(T_camObj),np.linalg.inv(T_botCam))
+    T_objBot = np.dot(np.linalg.inv(T_camObj), np.linalg.inv(T_botCam))
     return T_objBot
+
 
 def detected_obj_pose(T_camObj: Transform):
     '''
@@ -109,9 +115,9 @@ def detected_obj_pose(T_camObj: Transform):
     T_camObj = transform_to_htm(T_camObj)
     T_objBot = obj_in_bot_frame(T_camObj)
     pose = Pose()
-    pose.position.x = T_objBot[0,3]
-    pose.position.y = T_objBot[1,3]
-    pose.position.z = T_objBot[2,3]
+    pose.position.x = T_objBot[0, 3]
+    pose.position.y = T_objBot[1, 3]
+    pose.position.z = T_objBot[2, 3]
     # Figure a way to calc optimal orientation
     # pose.orientation.x = 0.90305
     # pose.orientation.y = 0.429622
@@ -132,18 +138,27 @@ def compensate_ball_radius(dx,dy,dz, R=21):
     
     # Distance from the camera to the ball.
     distance = math.sqrt(dx**2 + dy**2 + dz**2)
+
+    if distance == 0:
+        # When the ball is not initialized
+        return 0, 0, 0
+    else:
+        # Scale the displacement to account for the radius of the ball.
+        scaling_factor = (distance + R) / distance
+        
+        # Coordinates of the ball center
+        x_r = dx * scaling_factor
+        y_r = dy * scaling_factor
+        z_r = dz * scaling_factor
+        
+        return x_r, y_r, z_r
     
-    # Scale the displacement to account for the radius of the ball.
-    scaling_factor = (distance + R) / distance
-    
-    # Coordinates of the ball center
-    x_r = dx * scaling_factor
-    y_r = dy * scaling_factor
-    z_r = dz * scaling_factor
-    
-    return x_r, y_r, z_r
+def compensate_target_position(x, y, z):
+    return x, y-0.05, z +0.05
 
 # Test functions
+
+
 def test():
     manipulator_pos = np.array([
         [0.7071, -0.7071, 0, 1],
@@ -151,9 +166,10 @@ def test():
         [0, 0, 1, 0.66401457],
         [0, 0, 0, 1]
     ])
-    
+
     tranform = htm_to_transform(manipulator_pos)
     htm = transform_to_htm(tranform)
     print(htm)
+
 
 test()

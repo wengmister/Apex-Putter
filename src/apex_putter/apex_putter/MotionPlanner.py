@@ -19,11 +19,6 @@ Clients
     + /execute_trajectory (ExecuteTrajectory) - \
         Action client to execute planned trajectories.
 
-Dependencies
-------------
-    Uses the `RS` class (RobotState) for inverse kinematics and \
-    retrieving the end-effector pose.
-
 Parameters
 ----------
     + base_frame (str) - The reference frame for motion planning.
@@ -358,7 +353,7 @@ class MotionPlanner():
                 min_corner=self.workspace_min,
                 max_corner=self.workspace_max
             ),
-            start_state=start_state,
+            # start_state=start_state,
             goal_constraints=[goal_constraints],
             group_name=group_name,
             allowed_planning_time=20.0,
