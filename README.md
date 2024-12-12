@@ -1,5 +1,5 @@
 # Apex-Putter
-Project repo for ME495 Final Project Group 3, 2024 Fall
+Project repo for Group 3's Final Project for the 2024 Fall installment of Northweestern's ME495 Course.
 
 ## Authors:
 - Zhengyang Kris Weng
@@ -11,9 +11,15 @@ Project repo for ME495 Final Project Group 3, 2024 Fall
 
 
 ## Overview
-Miniature golf, even in its simplest form on a flat surface, presents an intriguing challenge for robotic systems. In this setup, a Franka Panda robot arm attempts the fundamental task of golf putting - striking a ball with just the right force to reach the hole. While humans develop this skill through intuition and practice, programming a robot to achieve the same feat requires precise control of position, force, and timing.
+As kids, we thought robots were the coolest things ever. We viewed them as the future that can and would do any task you gave it. We thought robots wouldn't have limits. Also in our naive ways, many kids believed mini golf was the dominant display of sportsmanship, control, and the overall "cool factor." A blast from the past, for our final project for ME 495, we've decided to integrate these naive views into one project: Robotic Mini Golf.
 
-Using a robotic arm for this seemingly simple task allows researchers to explore fundamental questions in robotics and control theory. The Franka Panda must execute precise movements to control both the direction and power of each putt, translating mathematical models of physics into real-world actions. This intersection of robotics and sports not only advances our understanding of robot control but also provides an engaging demonstration of how robots can perform tasks that humans often take for granted.
+Mini golf, a flat surface, presents an intriguing challenge for robotic systems. While kids develop mini golf skills through intuition, practice, and a little bit of healthy competition, programming a robot to achieve the same feat requires precision control of position and timing. A young kid needs a putter, a ball, a hole, and probably a bet and competition from their family/member to make a hole-in-one. They can just "eyeball."
+
+A Franka Robot? A lot more complex. It may not feel competition, but sure does feel the pressure from a badly planned cartesian path. In this setup, a Franka Panda robot arm attempts the fundamental task of mini golf - putting a ball with just enough force to reach the hole. 
+
+Our group uses vision integration via April Tag Detection, motion planning arm and joint positions, as well as cartesian paths, and just enough bit physics to prove that robots can play the simplest children's game (or "perfect" first date), but it's much more difficult than one would think.
+
+![clown](https://media1.giphy.com/media/dVLAuRFgEsjCw/200w.gif?cid=6c09b952rgld8zt5pfe67ng0yz2zz934dsd5us8qnwjw3roz&ep=v1_gifs_search&rid=200w.gif&ct=g)
 
 ## Mechanical System
 Main components of apex-putter:
