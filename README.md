@@ -49,10 +49,18 @@ Main ROS2 Nodes:
     - MoveIt! motion callbacks
 
 ## Sample Usage
-0. a) Follow `DEPENDENCIES.md` to setup your environment b) Source environment with `source_installs_zkw.sh` - please update with your paths c) Start Franka on station
+0. Follow `DEPENDENCIES.md` to setup your environment b) Source environment with `source_installs_zkw.sh` - please update with your paths c) Start Franka on station
 1. `ros2 launch apex_putter demo.launch.py`
 2. `ros2 service call /home_robot std_srvs/srv/Empty`
 3. `ros2 service call /ready std_srvs/srv/Empty`
 4. `ros2 service call /putt std_srvs/srv/Empty`
 
 ## Demo Videos
+RVIZ:
+
+https://github.com/user-attachments/assets/c37d6d04-b3b5-417b-8256-89fccbd9d821
+
+Live Demonstrations:
+
+https://github.com/user-attachments/assets/ca9eafb5-67a2-44d8-abbf-b2a758cc1057
+
