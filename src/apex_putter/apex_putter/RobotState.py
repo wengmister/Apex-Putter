@@ -108,7 +108,7 @@ class RobotState:
             pose.pose.orientation = transform.transform.rotation
             return pose
         except Exception as e:
-            # self.node.get_logger().error(f'Failed to get tf: {e}')
+            self.node.get_logger().error(f'Failed to get tf: {e}')
             return None
 
     def get_current_end_effector_pose(self):
@@ -120,7 +120,7 @@ class RobotState:
         """
         try:
             transform = self.tf_buffer.lookup_transform(
-                'base', self.end_effector_frame, rclpy.time.Time())
+                self.base_frame, self.end_effector_frame, rclpy.time.Time())
             pose = PoseStamped()
             pose.header = transform.header
             pose.pose.position = transform.transform.translation
